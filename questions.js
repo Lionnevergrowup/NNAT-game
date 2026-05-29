@@ -541,10 +541,22 @@
     return makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors), "Spatial Visualization");
   }
 
+  // The generators draw from a huge parameter space (shapes × colors ×
+  // patterns × sizes × rotations × positions), so every round is different.
+  // We also de-duplicate within a round so no puzzle repeats in the same game.
   function buildQuestions() {
     const Q = [];
+    const seen = new Set();
     const add = (gen, count) => {
-      for (let i = 0; i < count; i++) Q.push(gen());
+      let made = 0;
+      let guard = 0;
+      while (made < count && guard++ < count * 60) {
+        const q = gen();
+        if (seen.has(q.stimulus)) continue; // skip an identical puzzle
+        seen.add(q.stimulus);
+        Q.push(q);
+        made++;
+      }
     };
     add(genPattern, 14);
     add(genAnalogy, 14);

@@ -43,22 +43,25 @@
       </header>
 
       <main class="quiz-main">
-        <div class="prompt-head">
-          <span id="qtype" class="qtype-badge">Pattern Completion</span>
+        <div class="stage">
+          <div class="prompt-head">
+            <span id="qtype" class="qtype-badge">Pattern Completion</span>
+          </div>
+          <h2 id="prompt" class="prompt">Which piece completes the picture?</h2>
+          <div class="listen-row">
+            <button id="listen-btn" class="listen-btn" aria-label="Read the question aloud">🔊 Listen</button>
+          </div>
+          <div id="stimulus" class="stimulus"></div>
         </div>
-        <h2 id="prompt" class="prompt">Which piece completes the picture?</h2>
-        <div class="listen-row">
-          <button id="listen-btn" class="listen-btn" aria-label="Read the question aloud">🔊 Listen</button>
-        </div>
 
-        <div id="stimulus" class="stimulus"></div>
+        <div class="answer-area">
+          <div id="options" class="options"></div>
 
-        <div id="options" class="options"></div>
-
-        <div id="feedback" class="feedback hidden">
-          <div id="feedback-emoji" class="feedback-emoji"></div>
-          <div id="feedback-text" class="feedback-text"></div>
-          <button id="next-btn" class="btn btn-primary">Next ▶</button>
+          <div id="feedback" class="feedback hidden">
+            <div id="feedback-emoji" class="feedback-emoji"></div>
+            <div id="feedback-text" class="feedback-text"></div>
+            <button id="next-btn" class="btn btn-primary">Next ▶</button>
+          </div>
         </div>
       </main>
     </section>

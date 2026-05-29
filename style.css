@@ -200,7 +200,8 @@ body {
   display: flex;
   justify-content: center;
   margin: 0 auto 22px;
-  max-width: 320px;
+  max-width: min(320px, 56vh);
+  width: 100%;
 }
 .stimulus svg { width: 100%; height: auto; display: block; }
 
@@ -319,4 +320,56 @@ body {
 @media (max-width: 420px) {
   .hero h1 { font-size: 2.1rem; }
   .prompt { font-size: 1.15rem; }
+}
+
+/* =====================================================================
+   Fit-on-one-screen layouts.
+   In landscape (e.g. iPad), put the picture and the answers side by side
+   so the Next button is always visible without scrolling.
+   ===================================================================== */
+@media (orientation: landscape) and (min-width: 680px) {
+  body { display: flex; flex-direction: column; }
+  #app {
+    max-width: 1040px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .quiz-main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 26px;
+    align-items: center;
+  }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+  }
+  .stimulus { margin-bottom: 0; max-width: min(320px, 64vh); }
+  .answer-area { min-width: 0; }
+  .options { grid-template-columns: repeat(2, 1fr); }
+  .prompt { margin: 2px 0 10px; }
+  .feedback { margin-top: 14px; }
+  .site-footer { padding: 8px 16px; font-size: 0.72rem; }
+}
+
+/* Very short screens (phones held sideways): trim everything down. */
+@media (orientation: landscape) and (max-height: 480px) {
+  .topbar { margin-bottom: 8px; }
+  .quiz-main { padding: 12px; gap: 16px; }
+  .qtype-badge { margin-bottom: 6px; }
+  .prompt { font-size: 1.05rem; margin: 2px 0 6px; }
+  .listen-row { margin: -2px 0 6px; }
+  .listen-btn { padding: 6px 14px; }
+  .stimulus { max-width: min(240px, 60vh); }
+  .option { padding: 6px 6px 6px; border-width: 2px; }
+  .option-num { font-size: 0.72rem; }
+  .feedback { margin-top: 8px; }
+  .feedback-emoji { font-size: 1.8rem; }
+  .feedback-text { font-size: 1rem; margin: 2px 0 8px; }
+  .btn-primary { padding: 9px 20px; font-size: 1rem; }
+  .site-footer { display: none; }
 }

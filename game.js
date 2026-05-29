@@ -298,7 +298,10 @@
 
   // wire up buttons
   $("start-btn").addEventListener("click", startGame);
-  $("restart-btn").addEventListener("click", startGame);
+  $("restart-btn").addEventListener("click", () => {
+    stopSpeaking();
+    show(startScreen); // back to home so you can pick the number of questions
+  });
   nextBtn.addEventListener("click", () => {
     stopSpeaking();
     next();
