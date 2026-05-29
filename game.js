@@ -242,6 +242,7 @@
     scoreEl.textContent = "0";
     updateStreak();
     qTotal.textContent = String(questions.length);
+    updateSoundToggleUI();
     show(quizScreen);
     renderQuestion();
   }
@@ -473,9 +474,12 @@
 
   function updateSoundToggleUI() {
     const t = $("sound-toggle");
-    if (!t) return;
-    t.textContent = settings.voice ? "🔊" : "🔇";
-    t.classList.toggle("muted", !settings.voice);
+    if (t) {
+      t.textContent = settings.voice ? "🔊" : "🔇";
+      t.classList.toggle("muted", !settings.voice);
+    }
+    // a "Listen" button is pointless when read-aloud is off
+    if (listenBtn) listenBtn.style.display = settings.voice ? "" : "none";
   }
 
   function wireChips() {
@@ -724,6 +728,7 @@
       $("recent-list").innerHTML = html;
     }
   }
+  let progressBack = startScreen;
   function showProgress() {
     renderProgress();
     show(progressScreen);
@@ -739,9 +744,19 @@
   $("start-btn").addEventListener("click", startGame);
   $("open-settings").addEventListener("click", openSettings);
   $("settings-done").addEventListener("click", () => show(startScreen));
-  $("open-progress").addEventListener("click", openProgress);
-  $("open-progress-2").addEventListener("click", openProgress);
-  $("progress-done").addEventListener("click", () => show(startScreen));
+  $("open-progress").addEventListener("click", () => {
+    progressBack = startScreen;
+    openProgress();
+  });
+  $("open-progress-2").addEventListener("click", () => {
+    progressBack = resultScreen;
+    openProgress();
+  });
+  $("progress-done").addEventListener("click", () => show(progressBack));
+  $("quit-btn").addEventListener("click", () => {
+    stopSpeaking();
+    show(startScreen);
+  });
 
   // parent lock
   $("keypad").addEventListener("click", (e) => {
@@ -786,6 +801,14 @@
 
   // keyboard: 1-4 answer, Enter/Space next
   document.addEventListener("keydown", (e) => {
+    if (!lockScreen.classList.contains("hidden")) {
+      if (/^[0-9]$/.test(e.key)) pinPress(e.key);
+      else if (e.key === "Backspace") {
+        e.preventDefault();
+        pinPress("back");
+      } else if (e.key === "Escape") show(startScreen);
+      return;
+    }
     if (!quizScreen.classList.contains("hidden")) {
       if (!feedbackEl.classList.contains("hidden") && (e.key === "Enter" || e.key === " ")) {
         e.preventDefault();

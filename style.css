@@ -251,10 +251,10 @@ body {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   margin-bottom: 14px;
 }
-.progress-wrap { flex: 1; }
+.progress-wrap { flex: 1; min-width: 0; }
 .progress-text { font-weight: 800; color: var(--muted); font-size: 0.95rem; margin-bottom: 6px; }
 .progress-bar {
   height: 14px;
