@@ -15,6 +15,7 @@
   const resultScreen = $("result-screen");
   const settingsScreen = $("settings-screen");
   const progressScreen = $("progress-screen");
+  const lockScreen = $("lock-screen");
 
   const ALL_TYPES = [
     "Pattern Completion",
@@ -175,7 +176,7 @@
   // ---- Screen switching -----------------------------------------------
   function show(screen) {
     document.querySelectorAll(".fly").forEach((e) => e.remove());
-    [startScreen, quizScreen, resultScreen, settingsScreen, progressScreen].forEach((s) =>
+    [startScreen, quizScreen, resultScreen, settingsScreen, progressScreen, lockScreen].forEach((s) =>
       s.classList.add("hidden")
     );
     screen.classList.remove("hidden");
@@ -463,6 +464,11 @@
     setActive("set-speed", "speed", settings.speed, false);
     setActive("set-sfx", "sfx", settings.sfx ? "on" : "off", false);
     setActive("set-fx", "fx", settings.fx ? "on" : "off", false);
+    const locked = !!getPin();
+    $("lock-status").textContent = locked
+      ? "Lock is ON — a PIN is needed to open Settings & Progress."
+      : "No PIN set. Tap “Set / change PIN” to lock Settings & Progress.";
+    $("lock-remove").disabled = !locked;
   }
 
   function updateSoundToggleUI() {
@@ -538,9 +544,81 @@
     });
   }
 
-  function openSettings() {
+  function showSettings() {
     renderSettings();
     show(settingsScreen);
+  }
+  function openSettings() {
+    requireUnlock(showSettings);
+  }
+
+  // ---- Parent PIN lock ------------------------------------------------
+  let pinMode = "enter";
+  let pinAfter = null;
+  let pinBuffer = "";
+  function getPin() {
+    try {
+      return localStorage.getItem("nnat-pin") || "";
+    } catch (e) {
+      return "";
+    }
+  }
+  function setPin(v) {
+    try {
+      if (v) localStorage.setItem("nnat-pin", v);
+      else localStorage.removeItem("nnat-pin");
+    } catch (e) {}
+  }
+  function renderDots() {
+    const dots = $("pin-dots");
+    dots.innerHTML = "";
+    for (let i = 0; i < 4; i++) {
+      const d = document.createElement("span");
+      d.className = "pin-dot" + (i < pinBuffer.length ? " filled" : "");
+      dots.appendChild(d);
+    }
+  }
+  function openLock(mode, after) {
+    pinMode = mode;
+    pinAfter = after || null;
+    pinBuffer = "";
+    renderDots();
+    $("lock-title").textContent = mode === "set" ? "Set a PIN" : "Parents only";
+    $("lock-sub").textContent = mode === "set" ? "Choose a 4-digit PIN" : "Enter the 4-digit PIN";
+    show(lockScreen);
+  }
+  function requireUnlock(after) {
+    if (getPin()) openLock("enter", after);
+    else after();
+  }
+  function pinPress(k) {
+    if (k === "back") {
+      pinBuffer = pinBuffer.slice(0, -1);
+      renderDots();
+      return;
+    }
+    if (pinBuffer.length >= 4) return;
+    pinBuffer += k;
+    renderDots();
+    sfx("tap");
+    if (pinBuffer.length < 4) return;
+    const entered = pinBuffer;
+    setTimeout(() => {
+      if (pinMode === "set") {
+        setPin(entered);
+        showSettings();
+      } else if (entered === getPin()) {
+        const cb = pinAfter;
+        pinAfter = null;
+        if (cb) cb();
+      } else {
+        const card = lockScreen.querySelector(".lock-card");
+        card.classList.add("shakex");
+        setTimeout(() => card.classList.remove("shakex"), 400);
+        pinBuffer = "";
+        renderDots();
+      }
+    }, 130);
   }
 
   // ---- Progress dashboard ---------------------------------------------
@@ -556,11 +634,58 @@
   function statCard(icon, val, label) {
     return `<div class="stat-card"><div class="stat-icon">${icon}</div><div class="stat-val">${val}</div><div class="stat-label">${label}</div></div>`;
   }
+  function dateLabel(ts) {
+    if (!ts) return "Earlier";
+    const d = new Date(ts);
+    const now = new Date();
+    const sameDay = (a, b) =>
+      a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const yest = new Date(now);
+    yest.setDate(now.getDate() - 1);
+    if (sameDay(d, now)) return "Today";
+    if (sameDay(d, yest)) return "Yesterday";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function trendSVG() {
+    const games = stats.recent.slice(-10);
+    if (games.length < 2) return "";
+    const pts = games.map((g) => (g.total ? Math.round((100 * g.score) / g.total) : 0));
+    const W = 300,
+      H = 120,
+      padL = 24,
+      padR = 10,
+      padT = 12,
+      padB = 16;
+    const n = pts.length;
+    const x = (i) => padL + (i * (W - padL - padR)) / (n - 1);
+    const y = (v) => padT + ((100 - v) / 100) * (H - padT - padB);
+    const poly = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const dotsM = pts
+      .map((v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#6c5ce7"/>`)
+      .join("");
+    const gy = y(50).toFixed(1);
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <line x1="${padL}" y1="${y(100).toFixed(1)}" x2="${W - padR}" y2="${y(100).toFixed(1)}" stroke="#eef0f8"/>
+        <line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="#e6e8f5" stroke-dasharray="4 4"/>
+        <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${W - padR}" y2="${y(0).toFixed(1)}" stroke="#eef0f8"/>
+        <text x="2" y="${(y(100) + 4).toFixed(1)}" font-size="9" fill="#b9bed1">100</text>
+        <text x="6" y="${(y(50) + 4).toFixed(1)}" font-size="9" fill="#b9bed1">50</text>
+        <text x="10" y="${(y(0) + 4).toFixed(1)}" font-size="9" fill="#b9bed1">0</text>
+        <polyline points="${poly}" fill="none" stroke="#6c5ce7" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dotsM}
+      </svg>`;
+  }
+
   function renderProgress() {
     const hasData = stats.answered > 0;
     $("stats-empty").classList.toggle("hidden", hasData);
     $("type-section").classList.toggle("hidden", !hasData);
     $("recent-section").classList.toggle("hidden", !hasData);
+
+    const trend = trendSVG();
+    $("trend-section").classList.toggle("hidden", !trend);
+    $("trend-chart").innerHTML = trend;
 
     $("stat-summary").innerHTML = [
       statCard("🎮", stats.games, "Games"),
@@ -581,20 +706,30 @@
     }).join("");
 
     const rec = stats.recent.slice().reverse();
-    $("recent-list").innerHTML = rec.length
-      ? rec
-          .map(
-            (r) =>
-              `<div class="recent-row"><span>${r.score} / ${r.total}</span><span class="recent-stars">${
-                "⭐".repeat(r.stars || 0) || "–"
-              }</span></div>`
-          )
-          .join("")
-      : `<p class="set-note">No games yet.</p>`;
+    if (!rec.length) {
+      $("recent-list").innerHTML = `<p class="set-note">No games yet.</p>`;
+    } else {
+      let html = "";
+      let lastLabel = null;
+      rec.forEach((r) => {
+        const lab = dateLabel(r.ts);
+        if (lab !== lastLabel) {
+          html += `<div class="recent-date">${lab}</div>`;
+          lastLabel = lab;
+        }
+        html += `<div class="recent-row"><span>${r.score} / ${r.total}</span><span class="recent-stars">${
+          "⭐".repeat(r.stars || 0) || "–"
+        }</span></div>`;
+      });
+      $("recent-list").innerHTML = html;
+    }
   }
-  function openProgress() {
+  function showProgress() {
     renderProgress();
     show(progressScreen);
+  }
+  function openProgress() {
+    requireUnlock(showProgress);
   }
 
   // ---- Wire up --------------------------------------------------------
@@ -607,6 +742,20 @@
   $("open-progress").addEventListener("click", openProgress);
   $("open-progress-2").addEventListener("click", openProgress);
   $("progress-done").addEventListener("click", () => show(startScreen));
+
+  // parent lock
+  $("keypad").addEventListener("click", (e) => {
+    const k = e.target.closest(".key");
+    if (k && k.dataset.k) pinPress(k.dataset.k);
+  });
+  $("lock-cancel").addEventListener("click", () => show(startScreen));
+  $("lock-set").addEventListener("click", () => openLock("set"));
+  $("lock-remove").addEventListener("click", () => {
+    if (getPin() && window.confirm("Turn off the parent lock?")) {
+      setPin("");
+      renderSettings();
+    }
+  });
   $("reset-stats").addEventListener("click", () => {
     if (window.confirm("Clear all progress stats?")) {
       stats = freshStats();

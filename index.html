@@ -134,7 +134,41 @@
           </div>
         </div>
 
+        <div class="set-group">
+          <p class="set-label">🔒 Parent lock</p>
+          <div class="chips" id="set-lock">
+            <button class="chip" id="lock-set">Set / change PIN</button>
+            <button class="chip" id="lock-remove">Turn off</button>
+          </div>
+          <p class="set-note" id="lock-status"></p>
+        </div>
+
         <button id="settings-done" class="btn btn-primary">Done ✓</button>
+      </div>
+    </section>
+
+    <!-- Parent PIN lock screen -->
+    <section id="lock-screen" class="screen hidden">
+      <div class="card hero lock-card">
+        <div class="hero-emoji">🔒</div>
+        <h1 id="lock-title">Parents only</h1>
+        <p id="lock-sub" class="lead">Enter the 4-digit PIN</p>
+        <div id="pin-dots" class="pin-dots"></div>
+        <div class="keypad" id="keypad">
+          <button class="key" data-k="1">1</button>
+          <button class="key" data-k="2">2</button>
+          <button class="key" data-k="3">3</button>
+          <button class="key" data-k="4">4</button>
+          <button class="key" data-k="5">5</button>
+          <button class="key" data-k="6">6</button>
+          <button class="key" data-k="7">7</button>
+          <button class="key" data-k="8">8</button>
+          <button class="key" data-k="9">9</button>
+          <span class="key key-spacer"></span>
+          <button class="key" data-k="0">0</button>
+          <button class="key key-fn" data-k="back" aria-label="Delete">⌫</button>
+        </div>
+        <button id="lock-cancel" class="btn btn-ghost">Cancel</button>
       </div>
     </section>
 
@@ -147,6 +181,11 @@
 
         <div id="stats-empty" class="stats-empty hidden">
           <p>No games yet — play a round and your progress will show up here! 🌱</p>
+        </div>
+
+        <div class="set-group" id="trend-section">
+          <p class="set-label">Accuracy trend</p>
+          <div id="trend-chart" class="trend-chart"></div>
         </div>
 
         <div class="set-group" id="type-section">

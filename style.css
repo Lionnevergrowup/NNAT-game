@@ -112,6 +112,8 @@ body {
   box-shadow: 0 6px 14px rgba(108, 92, 231, 0.25);
 }
 .chip.nudge { animation: shake 0.4s; }
+.chip:disabled { opacity: 0.45; cursor: default; }
+.chip:disabled:hover { background: #f1ecff; }
 
 /* ---------- Settings page ---------- */
 .settings { text-align: center; }
@@ -195,6 +197,55 @@ body {
 
 .prog-actions { display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .prog-actions .btn-ghost { margin-top: 0; }
+
+/* ---------- trend chart ---------- */
+.trend-chart svg { width: 100%; height: auto; display: block; }
+
+/* ---------- recent date headers ---------- */
+.recent-date {
+  text-align: left;
+  font-weight: 800;
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 10px 0 2px;
+}
+
+/* ---------- parent lock keypad ---------- */
+.lock-card .lead { margin-bottom: 12px; }
+.pin-dots { display: flex; gap: 14px; justify-content: center; margin: 4px 0 20px; }
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: transparent;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.pin-dot.filled { background: var(--accent); transform: scale(1.1); }
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-width: 280px;
+  margin: 0 auto 18px;
+}
+.key {
+  font: inherit;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--ink);
+  background: #f4f5fb;
+  border: none;
+  border-radius: 16px;
+  padding: 16px 0;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.key:hover { background: #e9ebf6; }
+.key:active { transform: scale(0.94); }
+.key-fn { color: var(--accent); }
+.key-spacer { visibility: hidden; }
+.shakex { animation: shake 0.4s; }
 
 /* ---------- top bar ---------- */
 .topbar {

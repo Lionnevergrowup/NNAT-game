@@ -57,9 +57,17 @@ A 📊 **Progress** page (on the start and results screens) gives a parent/learn
 view of play history, stored locally in the browser:
 
 - Summary cards: games played, questions answered, overall accuracy, best streak.
+- **Accuracy trend** — a small SVG line chart of accuracy over recent games.
 - **Accuracy by puzzle type** bars for each of the four types.
-- A list of recent games with score and stars.
+- Recent games **grouped by date** (Today / Yesterday / date) with score and stars.
 - A **Reset stats** button to clear the history.
+
+### Parent lock 🔒
+
+Set an optional 4-digit PIN (in Settings → Parent lock). When set, opening
+**Settings** or **Progress** asks for the PIN first via a child-friendly keypad,
+so little ones can't change settings or clear stats. Turn it off any time from
+Settings. The PIN is stored locally in the browser.
 
 ## Audio (English read-aloud)
 
