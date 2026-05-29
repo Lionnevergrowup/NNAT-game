@@ -17,16 +17,8 @@
         <h1>NNAT3 <span>Level A</span></h1>
         <p class="subtitle">Pattern &amp; Picture Puzzles</p>
         <p class="lead">Look at the big picture. One piece is missing!<br />Tap the piece that fits best.</p>
-        <div class="count-select">
-          <p class="count-label">How many questions?</p>
-          <div class="count-chips" id="count-chips">
-            <button class="chip active" data-count="10">10</button>
-            <button class="chip" data-count="20">20</button>
-            <button class="chip" data-count="24">Half · 24</button>
-            <button class="chip" data-count="48">All · 48</button>
-          </div>
-        </div>
         <button id="start-btn" class="btn btn-primary">Start Playing ▶</button>
+        <button id="open-settings" class="btn btn-ghost">⚙️ Settings</button>
         <p class="hint">For ages 4–6 · No reading needed</p>
       </div>
     </section>
@@ -38,6 +30,7 @@
           <div class="progress-text"><span id="q-current">1</span> / <span id="q-total">10</span></div>
           <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         </div>
+        <div id="streak-chip" class="streak-chip hidden">🔥 <span id="streak">0</span></div>
         <button id="sound-toggle" class="icon-btn" title="Sound on/off" aria-label="Toggle sound">🔊</button>
         <div class="score-chip">⭐ <span id="score">0</span></div>
       </header>
@@ -73,7 +66,71 @@
         <h1 id="result-title">Great Job!</h1>
         <p class="lead">You got <strong><span id="final-score">0</span></strong> out of <span id="final-total">10</span> right!</p>
         <div id="stars" class="stars"></div>
+        <p id="best-streak-line" class="best-streak hidden">Best streak: <strong><span id="best-streak">0</span></strong> 🔥</p>
         <button id="restart-btn" class="btn btn-primary">Play Again ↻</button>
+      </div>
+    </section>
+
+    <!-- Settings screen -->
+    <section id="settings-screen" class="screen hidden">
+      <div class="card settings">
+        <h1 class="settings-title">⚙️ Settings</h1>
+
+        <div class="set-group">
+          <p class="set-label">How many questions?</p>
+          <div class="chips" id="set-count">
+            <button class="chip" data-count="10">10</button>
+            <button class="chip" data-count="20">20</button>
+            <button class="chip" data-count="24">Half · 24</button>
+            <button class="chip" data-count="48">All · 48</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">Which puzzles?</p>
+          <div class="chips" id="set-types">
+            <button class="chip" data-type="pattern">🧩 Patterns</button>
+            <button class="chip" data-type="analogy">🔗 Analogies</button>
+            <button class="chip" data-type="serial">➡️ Sequences</button>
+            <button class="chip" data-type="spatial">🔄 Turns</button>
+          </div>
+          <p class="set-note">Pick one or more.</p>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">Read questions aloud</p>
+          <div class="chips" id="set-voice">
+            <button class="chip" data-voice="on">🔊 On</button>
+            <button class="chip" data-voice="off">🔇 Off</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">Voice speed</p>
+          <div class="chips" id="set-speed">
+            <button class="chip" data-speed="slow">🐢 Slow</button>
+            <button class="chip" data-speed="normal">Normal</button>
+            <button class="chip" data-speed="fast">🐇 Fast</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">Fun sounds</p>
+          <div class="chips" id="set-sfx">
+            <button class="chip" data-sfx="on">🎵 On</button>
+            <button class="chip" data-sfx="off">Off</button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">Confetti &amp; celebration</p>
+          <div class="chips" id="set-fx">
+            <button class="chip" data-fx="on">🎉 On</button>
+            <button class="chip" data-fx="off">Off</button>
+          </div>
+        </div>
+
+        <button id="settings-done" class="btn btn-primary">Done ✓</button>
       </div>
     </section>
   </div>

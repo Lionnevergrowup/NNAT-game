@@ -548,13 +548,27 @@
   // The generators draw from a huge parameter space (shapes × colors ×
   // patterns × sizes × rotations × positions), so every round is different.
   // We also de-duplicate within a round so no puzzle repeats in the same game.
-  function buildQuestions() {
+  const GENERATORS = {
+    pattern: genPattern,
+    analogy: genAnalogy,
+    serial: genSerial,
+    spatial: genSpatial,
+  };
+
+  // opts: { count?: number, types?: string[] } — count is how many the player
+  // wants; types limits which generators are used (defaults to all four).
+  function buildQuestions(opts) {
+    opts = opts || {};
+    let types = (opts.types || []).filter((t) => GENERATORS[t]);
+    if (!types.length) types = Object.keys(GENERATORS);
+    const target = Math.max(1, opts.count || 48);
+
     const Q = [];
     const seen = new Set();
     const add = (gen, count) => {
       let made = 0;
       let guard = 0;
-      while (made < count && guard++ < count * 60) {
+      while (made < count && guard++ < count * 80) {
         const q = gen();
         if (seen.has(q.stimulus)) continue; // skip an identical puzzle
         seen.add(q.stimulus);
@@ -562,10 +576,9 @@
         made++;
       }
     };
-    add(genPattern, 14);
-    add(genAnalogy, 14);
-    add(genSerial, 10);
-    add(genSpatial, 10);
+    // generate an even share per chosen type, enough to cover the target
+    const perType = Math.ceil(target / types.length);
+    types.forEach((t) => add(GENERATORS[t], perType));
     return shuffle(Q);
   }
 

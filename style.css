@@ -82,10 +82,17 @@ body {
 .lead { font-size: 1.15rem; color: var(--ink); line-height: 1.5; margin: 0 0 22px; }
 .hint { color: var(--muted); font-size: 0.95rem; margin-top: 16px; }
 
-/* ---------- question-count picker ---------- */
-.count-select { margin: 4px 0 22px; }
-.count-label { font-weight: 800; color: var(--muted); margin: 0 0 10px; }
-.count-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+/* ---------- secondary / ghost button ---------- */
+.btn-ghost {
+  background: #f1ecff;
+  color: var(--accent);
+  font-size: 1.05rem;
+  margin-top: 12px;
+}
+.btn-ghost:hover { background: #e7dfff; }
+
+/* ---------- chips (used by Settings) ---------- */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .chip {
   font: inherit;
   font-weight: 800;
@@ -104,6 +111,30 @@ body {
   border-color: var(--accent);
   box-shadow: 0 6px 14px rgba(108, 92, 231, 0.25);
 }
+.chip.nudge { animation: shake 0.4s; }
+
+/* ---------- Settings page ---------- */
+.settings { text-align: center; }
+.settings-title { font-size: 2rem; margin: 0 0 18px; }
+.set-group { margin: 0 0 20px; }
+.set-label { font-weight: 800; color: var(--ink); margin: 0 0 10px; }
+.set-note { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+.settings .btn-primary { margin-top: 6px; }
+
+/* ---------- streak chip ---------- */
+.streak-chip {
+  background: linear-gradient(135deg, #ff924c, #ff5a5f);
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(255, 90, 95, 0.35);
+  animation: pop 0.3s ease;
+}
+
+/* ---------- results best streak ---------- */
+.best-streak { color: var(--muted); font-weight: 700; margin: -8px 0 18px; }
 
 /* ---------- top bar ---------- */
 .topbar {
@@ -276,7 +307,14 @@ body {
   margin-top: 22px;
   animation: pop 0.3s ease;
 }
-.feedback-emoji { font-size: 2.6rem; }
+.feedback-emoji { font-size: 2.6rem; display: inline-block; }
+.feedback-emoji.bounce { animation: mascotBounce 0.6s ease; }
+@keyframes mascotBounce {
+  0% { transform: scale(0.4) rotate(-12deg); }
+  45% { transform: scale(1.25) rotate(8deg); }
+  70% { transform: scale(0.92) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
 .feedback-text { font-size: 1.25rem; font-weight: 800; margin: 4px 0 14px; }
 @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
@@ -329,13 +367,7 @@ body {
    ===================================================================== */
 @media (orientation: landscape) and (min-width: 600px) {
   body { display: flex; flex-direction: column; }
-  #app {
-    max-width: 1040px;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
+  #app { max-width: 1040px; }
   .quiz-main {
     display: grid;
     grid-template-columns: 1fr 1fr;

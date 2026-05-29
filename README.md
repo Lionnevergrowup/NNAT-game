@@ -31,13 +31,31 @@ correct option glows.
 The layout fits on a single screen across phones and tablets, in both portrait
 and landscape (no scrolling to reach the Next button).
 
+## Settings page
+
+A ⚙️ **Settings** button on the start screen opens a dedicated page where every
+option lives (all choices are remembered between visits):
+
+- **How many questions** — 10 / 20 / Half (24) / All (48).
+- **Which puzzles** — turn each of the four puzzle types on or off (pick one or more).
+- **Read questions aloud** — English text-to-speech on/off.
+- **Voice speed** — 🐢 Slow / Normal / 🐇 Fast.
+- **Fun sounds** — playful answer sound effects on/off.
+- **Confetti & celebration** — turn the celebration effects on/off.
+
+## Fun
+
+- 🔥 **Streaks** — a streak counter appears for consecutive correct answers, with
+  a little fanfare and extra confetti at milestones (3, 5, 10, …).
+- 🎵 **Sound effects** — happy chimes for correct, a soft buzz for wrong, and a
+  victory jingle on a great score (synthesised in the browser, no audio files).
+- A bouncy mascot reaction and confetti bursts celebrate good answers.
+
 ## Audio (English read-aloud)
 
 Every question is read aloud in English using the browser's built-in
-text-to-speech, so pre-readers can play on their own.
-
-- 🔊 **Listen** button re-reads the current question.
-- The 🔊/🔇 toggle in the top bar turns sound on/off (remembered between visits).
+text-to-speech, so pre-readers can play on their own. The 🔊/🔇 button in the top
+bar is a quick mute; finer control (speed, effects) is on the Settings page.
 
 ## How to play
 
