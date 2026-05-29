@@ -93,6 +93,7 @@
   const TRY_AGAIN = ["Good try!", "Almost!", "Keep going!"];
 
   function show(screen) {
+    document.querySelectorAll(".fly").forEach((e) => e.remove()); // clear any in-flight clones
     [startScreen, quizScreen, resultScreen].forEach((s) => s.classList.add("hidden"));
     screen.classList.remove("hidden");
   }
@@ -251,13 +252,15 @@
     $("final-total").textContent = String(total);
 
     const ratio = score / total;
-    const filled = Math.max(1, Math.round(ratio * 5));
+    const filled = score === 0 ? 0 : Math.max(1, Math.round(ratio * 5));
     let starsHtml = "";
     for (let i = 0; i < 5; i++) starsHtml += i < filled ? "⭐" : "☆";
     $("stars").textContent = starsHtml;
 
     const emoji = ratio >= 0.8 ? "🏆" : ratio >= 0.5 ? "🎉" : "🌱";
     $("result-emoji").textContent = emoji;
+    const title = $("result-title");
+    if (title) title.textContent = ratio >= 0.8 ? "Amazing!" : ratio >= 0.5 ? "Great Job!" : "Good Try!";
     if (ratio >= 0.8) burst(true);
 
     const msg =

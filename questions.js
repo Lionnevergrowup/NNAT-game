@@ -72,10 +72,14 @@
     return `<g transform="${rotate}translate(${off},${off})">${shape(kind, color, s)}</g>`;
   }
 
-  // Draw `count` small dots in a row, centered (used for counting/serial items).
+  // Draw `count` small dots in a row, centered. The radius adapts to the
+  // count so the dots always fit inside the cell (even at 4).
   function dots(count, color, cellSize) {
-    const r = cellSize * 0.1;
-    const gap = cellSize * 0.08;
+    const usable = cellSize * 0.84;
+    const gapRatio = 0.6;
+    let r = usable / (count * 2 + (count - 1) * gapRatio);
+    r = Math.min(r, cellSize * 0.16);
+    const gap = r * gapRatio;
     const totalW = count * (2 * r) + (count - 1) * gap;
     const startX = (cellSize - totalW) / 2 + r;
     let s = "";

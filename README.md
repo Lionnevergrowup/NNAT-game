@@ -18,10 +18,18 @@ The game covers all four NNAT3 item types, with the difficulty kept at Level A:
 | **Serial Reasoning** | A row of pictures changes step by step (counting up, repeating colors, an arrow turning) — pick what comes next. |
 | **Spatial Visualization** | A shape is turned (a quarter turn or flipped over) — pick the option that shows the same turn. |
 
-There are **48 questions** each round, generated with built-in logic so the
-answer is always well-defined, and reshuffled every time you play. When a child
-answers correctly, the chosen piece **slides into the empty "?" spot** so they
-can see the completed picture.
+Questions are **generated procedurally** from a large parameter space (shapes ×
+colors × patterns × sizes × rotations × positions), so every round is different
+and no puzzle repeats within a round. On the start screen you pick how many to
+play: **10 / 20 / Half (24) / All (48)**.
+
+When a child answers **correctly**, the chosen piece **slides into the empty "?"
+spot** to reveal the completed picture. When they answer **incorrectly**, their
+pick drops into the slot too — so they can see it does *not* fit — while the
+correct option glows.
+
+The layout fits on a single screen across phones and tablets, in both portrait
+and landscape (no scrolling to reach the Next button).
 
 ## Audio (English read-aloud)
 
@@ -33,9 +41,10 @@ text-to-speech, so pre-readers can play on their own.
 
 ## How to play
 
-- Tap **Start Playing**.
+- Pick how many questions, then tap **Start Playing**.
 - Listen to the question (or tap **Listen**), look at the puzzle, then tap an answer.
 - Get a ⭐ for each correct answer; see how many stars you earn at the end.
+- **Play Again** returns to the start screen so you can choose a new amount.
 - Keyboard friendly: press **1–4** to choose, **Enter/Space** for the next question.
 
 ## Run locally
@@ -63,7 +72,7 @@ To turn it on once:
 
 ```
 index.html      # screens & layout
-style.css       # kid-friendly styling, animations
-questions.js    # SVG rendering engine + curated question bank
-game.js         # game flow: scoring, feedback, results
+style.css       # kid-friendly styling, animations, responsive layout
+questions.js    # SVG rendering engine + procedural question generators
+game.js         # game flow: count picker, scoring, feedback, audio, results
 ```

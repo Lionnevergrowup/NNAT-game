@@ -327,7 +327,7 @@ body {
    In landscape (e.g. iPad), put the picture and the answers side by side
    so the Next button is always visible without scrolling.
    ===================================================================== */
-@media (orientation: landscape) and (min-width: 680px) {
+@media (orientation: landscape) and (min-width: 600px) {
   body { display: flex; flex-direction: column; }
   #app {
     max-width: 1040px;
@@ -340,7 +340,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 26px;
-    align-items: center;
+    align-items: start;
   }
   .stage {
     display: flex;
