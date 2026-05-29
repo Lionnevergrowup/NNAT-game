@@ -31,6 +31,7 @@
   let index = 0;
   let score = 0;
   let locked = false; // prevents double answering
+  let chosenCount = 10; // how many questions the player picked
 
   // ---- English text-to-speech (Web Speech API) ----
   const synth = window.speechSynthesis || null;
@@ -98,7 +99,8 @@
 
   function startGame() {
     stopSpeaking();
-    questions = NNAT.buildQuestions();
+    const deck = NNAT.buildQuestions();
+    questions = deck.slice(0, Math.min(chosenCount, deck.length));
     index = 0;
     score = 0;
     scoreEl.textContent = "0";
@@ -281,6 +283,17 @@
       document.body.appendChild(p);
       setTimeout(() => p.remove(), 1200);
     }
+  }
+
+  // question-count chips
+  const countChips = $("count-chips");
+  if (countChips) {
+    countChips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      chosenCount = parseInt(chip.dataset.count, 10) || chosenCount;
+      Array.from(countChips.children).forEach((c) => c.classList.toggle("active", c === chip));
+    });
   }
 
   // wire up buttons
