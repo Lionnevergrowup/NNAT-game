@@ -14,6 +14,14 @@
   const quizScreen = $("quiz-screen");
   const resultScreen = $("result-screen");
   const settingsScreen = $("settings-screen");
+  const progressScreen = $("progress-screen");
+
+  const ALL_TYPES = [
+    "Pattern Completion",
+    "Reasoning by Analogy",
+    "Serial Reasoning",
+    "Spatial Visualization",
+  ];
 
   // Quiz elements
   const promptEl = $("prompt");
@@ -167,8 +175,55 @@
   // ---- Screen switching -----------------------------------------------
   function show(screen) {
     document.querySelectorAll(".fly").forEach((e) => e.remove());
-    [startScreen, quizScreen, resultScreen, settingsScreen].forEach((s) => s.classList.add("hidden"));
+    [startScreen, quizScreen, resultScreen, settingsScreen, progressScreen].forEach((s) =>
+      s.classList.add("hidden")
+    );
     screen.classList.remove("hidden");
+  }
+
+  // ---- Stats / progress (persisted) -----------------------------------
+  function freshStats() {
+    const byType = {};
+    ALL_TYPES.forEach((t) => (byType[t] = { a: 0, c: 0 }));
+    return { games: 0, answered: 0, correct: 0, stars: 0, bestStreak: 0, byType, recent: [] };
+  }
+  let stats = loadStats();
+  function loadStats() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("nnat-stats"));
+      if (!saved) return freshStats();
+      const s = Object.assign(freshStats(), saved);
+      const bt = freshStats().byType;
+      ALL_TYPES.forEach((t) => {
+        if (saved.byType && saved.byType[t]) bt[t] = { a: saved.byType[t].a || 0, c: saved.byType[t].c || 0 };
+      });
+      s.byType = bt;
+      s.recent = Array.isArray(saved.recent) ? saved.recent.slice(-10) : [];
+      return s;
+    } catch (e) {
+      return freshStats();
+    }
+  }
+  function saveStats() {
+    try {
+      localStorage.setItem("nnat-stats", JSON.stringify(stats));
+    } catch (e) {}
+  }
+  function recordAnswer(type, correct) {
+    stats.answered += 1;
+    if (correct) stats.correct += 1;
+    if (!stats.byType[type]) stats.byType[type] = { a: 0, c: 0 };
+    stats.byType[type].a += 1;
+    if (correct) stats.byType[type].c += 1;
+    saveStats();
+  }
+  function recordGame(score, total, starsEarned, best) {
+    stats.games += 1;
+    stats.stars += starsEarned;
+    stats.bestStreak = Math.max(stats.bestStreak, best);
+    stats.recent.push({ score, total, stars: starsEarned, ts: Date.now() });
+    stats.recent = stats.recent.slice(-10);
+    saveStats();
   }
 
   // ---- Game flow ------------------------------------------------------
@@ -238,6 +293,7 @@
 
     const q = questions[index];
     const correct = i === q.answer;
+    recordAnswer(q.type || "Puzzle", correct);
     const allBtns = Array.from(optionsEl.children);
 
     allBtns.forEach((b, bi) => {
@@ -356,6 +412,8 @@
     let starsHtml = "";
     for (let i = 0; i < 5; i++) starsHtml += i < filled ? "⭐" : "☆";
     $("stars").textContent = starsHtml;
+
+    recordGame(score, total, filled, bestStreak);
 
     const emoji = ratio >= 0.8 ? "🏆" : ratio >= 0.5 ? "🎉" : "🌱";
     $("result-emoji").textContent = emoji;
@@ -485,6 +543,60 @@
     show(settingsScreen);
   }
 
+  // ---- Progress dashboard ---------------------------------------------
+  const TYPE_SHORT = {
+    "Pattern Completion": "🧩 Patterns",
+    "Reasoning by Analogy": "🔗 Analogies",
+    "Serial Reasoning": "➡️ Sequences",
+    "Spatial Visualization": "🔄 Turns",
+  };
+  function pct(c, a) {
+    return a ? Math.round((100 * c) / a) : 0;
+  }
+  function statCard(icon, val, label) {
+    return `<div class="stat-card"><div class="stat-icon">${icon}</div><div class="stat-val">${val}</div><div class="stat-label">${label}</div></div>`;
+  }
+  function renderProgress() {
+    const hasData = stats.answered > 0;
+    $("stats-empty").classList.toggle("hidden", hasData);
+    $("type-section").classList.toggle("hidden", !hasData);
+    $("recent-section").classList.toggle("hidden", !hasData);
+
+    $("stat-summary").innerHTML = [
+      statCard("🎮", stats.games, "Games"),
+      statCard("❓", stats.answered, "Answered"),
+      statCard("🎯", pct(stats.correct, stats.answered) + "%", "Accuracy"),
+      statCard("🔥", stats.bestStreak, "Best streak"),
+    ].join("");
+
+    $("type-bars").innerHTML = ALL_TYPES.map((t) => {
+      const d = stats.byType[t] || { a: 0, c: 0 };
+      const p = pct(d.c, d.a);
+      return `<div class="bar-row">
+          <div class="bar-top"><span>${TYPE_SHORT[t] || t}</span><span class="bar-val">${
+        d.a ? p + "% · " + d.c + "/" + d.a : "—"
+      }</span></div>
+          <div class="bar"><div class="bar-fill" style="width:${d.a ? p : 0}%"></div></div>
+        </div>`;
+    }).join("");
+
+    const rec = stats.recent.slice().reverse();
+    $("recent-list").innerHTML = rec.length
+      ? rec
+          .map(
+            (r) =>
+              `<div class="recent-row"><span>${r.score} / ${r.total}</span><span class="recent-stars">${
+                "⭐".repeat(r.stars || 0) || "–"
+              }</span></div>`
+          )
+          .join("")
+      : `<p class="set-note">No games yet.</p>`;
+  }
+  function openProgress() {
+    renderProgress();
+    show(progressScreen);
+  }
+
   // ---- Wire up --------------------------------------------------------
   updateSoundToggleUI();
   wireChips();
@@ -492,6 +604,16 @@
   $("start-btn").addEventListener("click", startGame);
   $("open-settings").addEventListener("click", openSettings);
   $("settings-done").addEventListener("click", () => show(startScreen));
+  $("open-progress").addEventListener("click", openProgress);
+  $("open-progress-2").addEventListener("click", openProgress);
+  $("progress-done").addEventListener("click", () => show(startScreen));
+  $("reset-stats").addEventListener("click", () => {
+    if (window.confirm("Clear all progress stats?")) {
+      stats = freshStats();
+      saveStats();
+      renderProgress();
+    }
+  });
   $("restart-btn").addEventListener("click", () => {
     stopSpeaking();
     show(startScreen);

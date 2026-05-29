@@ -51,6 +51,16 @@ option lives (all choices are remembered between visits):
   victory jingle on a great score (synthesised in the browser, no audio files).
 - A bouncy mascot reaction and confetti bursts celebrate good answers.
 
+## Progress dashboard
+
+A 📊 **Progress** page (on the start and results screens) gives a parent/learner
+view of play history, stored locally in the browser:
+
+- Summary cards: games played, questions answered, overall accuracy, best streak.
+- **Accuracy by puzzle type** bars for each of the four types.
+- A list of recent games with score and stars.
+- A **Reset stats** button to clear the history.
+
 ## Audio (English read-aloud)
 
 Every question is read aloud in English using the browser's built-in

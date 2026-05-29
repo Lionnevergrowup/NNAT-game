@@ -136,6 +136,66 @@ body {
 /* ---------- results best streak ---------- */
 .best-streak { color: var(--muted); font-weight: 700; margin: -8px 0 18px; }
 
+/* ---------- home links row ---------- */
+.home-links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.home-links .btn-ghost { margin-top: 0; }
+
+/* ---------- progress dashboard ---------- */
+.progress-page { text-align: center; }
+.stats-empty { color: var(--muted); font-weight: 700; padding: 10px 0 4px; }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+@media (min-width: 520px) {
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+}
+.stat-card {
+  background: linear-gradient(160deg, #f6f3ff, #ffffff);
+  border: 2px solid #ece7fb;
+  border-radius: 16px;
+  padding: 14px 8px;
+}
+.stat-icon { font-size: 1.6rem; }
+.stat-val { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+.stat-label { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+
+.type-bars { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { text-align: left; }
+.bar-top {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  font-size: 0.95rem;
+  margin-bottom: 5px;
+}
+.bar-val { color: var(--muted); }
+.bar { height: 14px; background: #e6e8f5; border-radius: 999px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.recent-list { display: flex; flex-direction: column; gap: 8px; }
+.recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f7f8fd;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-weight: 800;
+}
+.recent-stars { letter-spacing: 1px; }
+
+.prog-actions { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.prog-actions .btn-ghost { margin-top: 0; }
+
 /* ---------- top bar ---------- */
 .topbar {
   display: flex;

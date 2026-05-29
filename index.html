@@ -18,7 +18,10 @@
         <p class="subtitle">Pattern &amp; Picture Puzzles</p>
         <p class="lead">Look at the big picture. One piece is missing!<br />Tap the piece that fits best.</p>
         <button id="start-btn" class="btn btn-primary">Start Playing ▶</button>
-        <button id="open-settings" class="btn btn-ghost">⚙️ Settings</button>
+        <div class="home-links">
+          <button id="open-settings" class="btn btn-ghost">⚙️ Settings</button>
+          <button id="open-progress" class="btn btn-ghost">📊 Progress</button>
+        </div>
         <p class="hint">For ages 4–6 · No reading needed</p>
       </div>
     </section>
@@ -68,6 +71,7 @@
         <div id="stars" class="stars"></div>
         <p id="best-streak-line" class="best-streak hidden">Best streak: <strong><span id="best-streak">0</span></strong> 🔥</p>
         <button id="restart-btn" class="btn btn-primary">Play Again ↻</button>
+        <button id="open-progress-2" class="btn btn-ghost">📊 See Progress</button>
       </div>
     </section>
 
@@ -131,6 +135,34 @@
         </div>
 
         <button id="settings-done" class="btn btn-primary">Done ✓</button>
+      </div>
+    </section>
+
+    <!-- Progress / dashboard screen -->
+    <section id="progress-screen" class="screen hidden">
+      <div class="card progress-page">
+        <h1 class="settings-title">📊 Progress</h1>
+
+        <div id="stat-summary" class="stat-grid"></div>
+
+        <div id="stats-empty" class="stats-empty hidden">
+          <p>No games yet — play a round and your progress will show up here! 🌱</p>
+        </div>
+
+        <div class="set-group" id="type-section">
+          <p class="set-label">Accuracy by puzzle type</p>
+          <div id="type-bars" class="type-bars"></div>
+        </div>
+
+        <div class="set-group" id="recent-section">
+          <p class="set-label">Recent games</p>
+          <div id="recent-list" class="recent-list"></div>
+        </div>
+
+        <div class="prog-actions">
+          <button id="progress-done" class="btn btn-primary">Done ✓</button>
+          <button id="reset-stats" class="btn btn-ghost">Reset stats</button>
+        </div>
       </div>
     </section>
   </div>
