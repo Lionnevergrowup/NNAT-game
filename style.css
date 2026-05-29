@@ -516,3 +516,24 @@ body {
   .btn-primary { padding: 9px 20px; font-size: 1rem; }
   .site-footer { display: none; }
 }
+
+/* =====================================================================
+   Respect the OS "Reduce Motion" setting — keep the game usable but calm
+   the decorative animations for motion-sensitive players.
+   ===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none !important; }
+  .feedback-emoji.bounce,
+  .option.correct,
+  .hole-fill,
+  .feedback,
+  .streak-chip,
+  .chip.nudge,
+  .option.wrong {
+    animation: none !important;
+  }
+  .fly { transition-duration: 0.001s !important; }
+  .progress-fill,
+  .bar-fill { transition: none !important; }
+  * { scroll-behavior: auto !important; }
+}
