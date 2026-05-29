@@ -109,6 +109,7 @@
 
   function renderQuestion() {
     locked = false;
+    document.querySelectorAll(".fly").forEach((e) => e.remove());
     const q = questions[index];
 
     $("qtype").textContent = q.type || "Puzzle";
@@ -154,15 +155,15 @@
       feedbackEmoji.textContent = "🌟";
       feedbackText.textContent = PRAISE[Math.floor(Math.random() * PRAISE.length)];
       burst(true);
-      animateFill(btn);
+      animateFill(btn, false);
       speak(feedbackText.textContent.replace("🎉", ""));
     } else {
       btn.classList.add("wrong");
       feedbackEmoji.textContent = "💡";
       feedbackText.textContent =
-        TRY_AGAIN[Math.floor(Math.random() * TRY_AGAIN.length)] + " Here is the right piece.";
-      // show the correct answer by flying ITS tile into the hole
-      animateFill(allBtns[q.answer]);
+        TRY_AGAIN[Math.floor(Math.random() * TRY_AGAIN.length)] + " That piece does not fit. The glowing one is right.";
+      // drop the picked (wrong) piece into the slot so it's clearly a misfit
+      animateFill(btn, true);
       speak(feedbackText.textContent);
     }
 
@@ -171,12 +172,15 @@
     progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
   }
 
-  // Fly the chosen tile into the "?" hole, then reveal the completed picture.
-  function animateFill(btn) {
+  // Fly the chosen tile into the "?" hole.
+  //  leaveInHole=false (correct): reveal the completed correct picture.
+  //  leaveInHole=true  (wrong):   drop the picked piece into the slot so the
+  //                               child can see it does NOT fit the pattern.
+  function animateFill(btn, leaveInHole) {
     const q = questions[index];
     const svgEl = stimulusEl.querySelector("svg");
-    if (!q.solved || !q.hole || !q.vb || !svgEl) {
-      if (q.solved) stimulusEl.innerHTML = q.solved;
+    if (!q.hole || !q.vb || !svgEl) {
+      if (!leaveInHole && q.solved) stimulusEl.innerHTML = q.solved;
       return;
     }
     const srect = svgEl.getBoundingClientRect();
@@ -210,7 +214,20 @@
     );
 
     setTimeout(() => {
-      stimulusEl.innerHTML = q.solved; // reveal completed picture beneath
+      if (leaveInHole) {
+        // place the picked piece in the slot, anchored to the picture
+        const cont = stimulusEl.getBoundingClientRect();
+        const ov = document.createElement("div");
+        ov.className = "hole-fill";
+        ov.innerHTML = art.innerHTML;
+        ov.style.left = holeLeft - cont.left + "px";
+        ov.style.top = holeTop - cont.top + "px";
+        ov.style.width = holeW + "px";
+        ov.style.height = holeH + "px";
+        stimulusEl.appendChild(ov);
+      } else {
+        stimulusEl.innerHTML = q.solved; // reveal completed picture beneath
+      }
       fly.classList.add("landed");
       setTimeout(() => fly.remove(), 160);
     }, 620);
