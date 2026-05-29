@@ -18,7 +18,10 @@ The game covers all four NNAT3 item types, with the difficulty kept at Level A:
 | **Serial Reasoning** | A row of pictures changes step by step (counting up, repeating colors, an arrow turning) — pick what comes next. |
 | **Spatial Visualization** | A shape is turned (a quarter turn or flipped over) — pick the option that shows the same turn. |
 
-There are 22 questions; the order is reshuffled every time you play.
+There are **48 questions** each round, generated with built-in logic so the
+answer is always well-defined, and reshuffled every time you play. When a child
+answers correctly, the chosen piece **slides into the empty "?" spot** so they
+can see the completed picture.
 
 ## Audio (English read-aloud)
 

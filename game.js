@@ -154,6 +154,7 @@
       feedbackEmoji.textContent = "🌟";
       feedbackText.textContent = PRAISE[Math.floor(Math.random() * PRAISE.length)];
       burst(true);
+      animateFill(btn);
       speak(feedbackText.textContent.replace("🎉", ""));
     } else {
       btn.classList.add("wrong");
@@ -166,6 +167,51 @@
     nextBtn.textContent = index === questions.length - 1 ? "See My Stars ⭐" : "Next ▶";
     feedbackEl.classList.remove("hidden");
     progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
+  }
+
+  // Fly the chosen tile into the "?" hole, then reveal the completed picture.
+  function animateFill(btn) {
+    const q = questions[index];
+    const svgEl = stimulusEl.querySelector("svg");
+    if (!q.solved || !q.hole || !q.vb || !svgEl) {
+      if (q.solved) stimulusEl.innerHTML = q.solved;
+      return;
+    }
+    const srect = svgEl.getBoundingClientRect();
+    const scale = srect.width / q.vb.w;
+    const holeLeft = srect.left + q.hole.x * scale;
+    const holeTop = srect.top + q.hole.y * scale;
+    const holeW = q.hole.w * scale;
+    const holeH = q.hole.h * scale;
+
+    const art = btn.querySelector(".option-art");
+    const arect = art.getBoundingClientRect();
+
+    const fly = document.createElement("div");
+    fly.className = "fly";
+    fly.innerHTML = art.innerHTML;
+    fly.style.left = arect.left + "px";
+    fly.style.top = arect.top + "px";
+    fly.style.width = arect.width + "px";
+    fly.style.height = arect.height + "px";
+    document.body.appendChild(fly);
+
+    // next frame: animate toward the hole position & size
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const tx = holeLeft - arect.left;
+        const ty = holeTop - arect.top;
+        const sx = holeW / arect.width;
+        const sy = holeH / arect.height;
+        fly.style.transform = `translate(${tx}px, ${ty}px) scale(${sx}, ${sy})`;
+      })
+    );
+
+    setTimeout(() => {
+      stimulusEl.innerHTML = q.solved; // reveal completed picture beneath
+      fly.classList.add("landed");
+      setTimeout(() => fly.remove(), 160);
+    }, 620);
   }
 
   function next() {
