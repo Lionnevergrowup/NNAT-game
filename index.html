@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NNAT3 Level A — Practice Game</title>
+  <meta name="description" content="A kid-friendly NNAT3 Level A style nonverbal reasoning practice game. Answer one question at a time." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>" />
+</head>
+<body>
+  <div id="app">
+    <!-- Start screen -->
+    <section id="start-screen" class="screen">
+      <div class="card hero">
+        <div class="hero-emoji">🧩</div>
+        <h1>NNAT3 <span>Level A</span></h1>
+        <p class="subtitle">Pattern &amp; Picture Puzzles</p>
+        <p class="lead">Look at the big picture. One piece is missing!<br />Tap the piece that fits best.</p>
+        <button id="start-btn" class="btn btn-primary">Start Playing ▶</button>
+        <p class="hint">For ages 4–6 · No reading needed</p>
+      </div>
+    </section>
+
+    <!-- Quiz screen -->
+    <section id="quiz-screen" class="screen hidden">
+      <header class="topbar">
+        <div class="progress-wrap">
+          <div class="progress-text"><span id="q-current">1</span> / <span id="q-total">10</span></div>
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        </div>
+        <div class="score-chip">⭐ <span id="score">0</span></div>
+      </header>
+
+      <main class="quiz-main">
+        <div class="prompt-head">
+          <span id="qtype" class="qtype-badge">Pattern Completion</span>
+        </div>
+        <h2 id="prompt" class="prompt">Which piece completes the picture?</h2>
+
+        <div id="stimulus" class="stimulus"></div>
+
+        <div id="options" class="options"></div>
+
+        <div id="feedback" class="feedback hidden">
+          <div id="feedback-emoji" class="feedback-emoji"></div>
+          <div id="feedback-text" class="feedback-text"></div>
+          <button id="next-btn" class="btn btn-primary">Next ▶</button>
+        </div>
+      </main>
+    </section>
+
+    <!-- Results screen -->
+    <section id="result-screen" class="screen hidden">
+      <div class="card hero">
+        <div id="result-emoji" class="hero-emoji">🎉</div>
+        <h1>Great Job!</h1>
+        <p class="lead">You got <strong><span id="final-score">0</span></strong> out of <span id="final-total">10</span> right!</p>
+        <div id="stars" class="stars"></div>
+        <button id="restart-btn" class="btn btn-primary">Play Again ↻</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="site-footer">
+    <p>Made for nonverbal reasoning practice · NNAT3® Level A style · Not affiliated with NCS Pearson.</p>
+  </footer>
+
+  <script src="questions.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
