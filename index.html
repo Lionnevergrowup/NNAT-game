@@ -29,6 +29,7 @@
           <div class="progress-text"><span id="q-current">1</span> / <span id="q-total">10</span></div>
           <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         </div>
+        <button id="sound-toggle" class="icon-btn" title="Sound on/off" aria-label="Toggle sound">🔊</button>
         <div class="score-chip">⭐ <span id="score">0</span></div>
       </header>
 
@@ -37,6 +38,9 @@
           <span id="qtype" class="qtype-badge">Pattern Completion</span>
         </div>
         <h2 id="prompt" class="prompt">Which piece completes the picture?</h2>
+        <div class="listen-row">
+          <button id="listen-btn" class="listen-btn" aria-label="Read the question aloud">🔊 Listen</button>
+        </div>
 
         <div id="stimulus" class="stimulus"></div>
 

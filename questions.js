@@ -45,6 +45,18 @@
         return star(c, c, r, color);
       case "heart":
         return heart(c, c, r, color);
+      case "arrow":
+        // an upward arrow — clearly asymmetric so rotation is visible
+        return (
+          `<polygon points="${c},${size * 0.12} ${size * 0.78},${size * 0.52} ${size * 0.22},${size * 0.52}" fill="${color}"/>` +
+          `<rect x="${c - size * 0.1}" y="${size * 0.5}" width="${size * 0.2}" height="${size * 0.36}" rx="${size * 0.03}" fill="${color}"/>`
+        );
+      case "flag":
+        // a little flag on a pole — also orientation dependent
+        return (
+          `<rect x="${size * 0.3}" y="${size * 0.15}" width="${size * 0.06}" height="${size * 0.7}" rx="2" fill="${color}"/>` +
+          `<polygon points="${size * 0.36},${size * 0.18} ${size * 0.78},${size * 0.32} ${size * 0.36},${size * 0.46}" fill="${color}"/>`
+        );
       case "blank":
         return "";
       default:
@@ -52,11 +64,48 @@
     }
   }
 
-  // Draw a shape centered inside a cell of `cellSize`, scaled by `scale`.
-  function shapeScaled(kind, color, cellSize, scale) {
+  // Draw a shape centered inside a cell of `cellSize`, scaled and rotated.
+  function shapeScaled(kind, color, cellSize, scale, rot) {
     const s = cellSize * (scale || 1);
     const off = (cellSize - s) / 2;
-    return `<g transform="translate(${off},${off})">${shape(kind, color, s)}</g>`;
+    const rotate = rot ? `rotate(${rot} ${cellSize / 2} ${cellSize / 2}) ` : "";
+    return `<g transform="${rotate}translate(${off},${off})">${shape(kind, color, s)}</g>`;
+  }
+
+  // Draw `count` small dots in a row, centered (used for counting/serial items).
+  function dots(count, color, cellSize) {
+    const r = cellSize * 0.1;
+    const gap = cellSize * 0.08;
+    const totalW = count * (2 * r) + (count - 1) * gap;
+    const startX = (cellSize - totalW) / 2 + r;
+    let s = "";
+    for (let i = 0; i < count; i++) {
+      const cx = startX + i * (2 * r + gap);
+      s += `<circle cx="${cx}" cy="${cellSize / 2}" r="${r}" fill="${color}"/>`;
+    }
+    return s;
+  }
+
+  // Render any cell spec ({kind,color,scale,rot} or {kind:'dots',count,color}).
+  function renderSpec(spec, cellSize) {
+    if (spec.kind === "dots") return dots(spec.count, spec.color, cellSize);
+    return shapeScaled(spec.kind, spec.color, cellSize, spec.scale, spec.rot);
+  }
+
+  // White answer tile containing any spec.
+  function specTileSVG(spec) {
+    const S = 90;
+    return svgWrap(
+      `<rect x="0" y="0" width="${S}" height="${S}" rx="12" fill="#ffffff" stroke="#d6d9e6" stroke-width="2"/>${renderSpec(
+        spec,
+        S
+      )}`,
+      S
+    );
+  }
+
+  function svgWrapWH(body, w, h) {
+    return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">${body}</svg>`;
   }
 
   function star(cx, cy, r, color) {
@@ -113,19 +162,6 @@
     const S = 90;
     return svgWrap(
       `<rect x="0" y="0" width="${S}" height="${S}" rx="12" fill="${color}" stroke="#d6d9e6" stroke-width="2"/>`,
-      S
-    );
-  }
-
-  function shapeTileSVG(kind, color, scale) {
-    const S = 90;
-    return svgWrap(
-      `<rect x="0" y="0" width="${S}" height="${S}" rx="12" fill="#ffffff" stroke="#d6d9e6" stroke-width="2"/>${shapeScaled(
-        kind,
-        color,
-        S,
-        scale
-      )}`,
       S
     );
   }
@@ -214,7 +250,7 @@
         const spec = cells[y][x];
         const content = isMissing
           ? cell("", cs, { missing: true, bg: "#fffef2" })
-          : cell(shapeScaled(spec.kind, spec.color, cs, spec.scale), cs, { bg: "#ffffff" });
+          : cell(renderSpec(spec, cs), cs, { bg: "#ffffff" });
         body += inner + content + "</g>";
       }
     }
@@ -222,7 +258,34 @@
       type: type || "Reasoning by Analogy",
       prompt,
       stimulus: svgWrap(body, S),
-      options: optionSpecs.map((s) => shapeTileSVG(s.kind, s.color, s.scale)),
+      options: optionSpecs.map((s) => specTileSVG(s)),
+      answer: answerIdx,
+    };
+  }
+
+  // Build a horizontal "series" question: a strip of cells, one is missing
+  // (use null), and the answer continues the sequence.
+  function makeSeries(prompt, cellsRow, optionSpecs, type) {
+    const answerIdx = optionSpecs.findIndex((s) => s.correct);
+    const n = cellsRow.length;
+    const cs = 76;
+    const gap = 12;
+    const W = n * cs + (n - 1) * gap;
+    const H = cs;
+    let body = "";
+    cellsRow.forEach((spec, i) => {
+      const x = i * (cs + gap);
+      const content =
+        spec === null
+          ? cell("", cs, { missing: true, bg: "#fffef2" })
+          : cell(renderSpec(spec, cs), cs, { bg: "#ffffff" });
+      body += `<g transform="translate(${x},0)">${content}</g>`;
+    });
+    return {
+      type: type || "Serial Reasoning",
+      prompt,
+      stimulus: svgWrapWH(body, W, H),
+      options: optionSpecs.map((s) => specTileSVG(s)),
       answer: answerIdx,
     };
   }
@@ -417,10 +480,10 @@
       )
     );
 
-    // --- 12. Pattern Completion: diagonal 5-color final challenge ---
+    // --- 12. Pattern Completion: diagonal 5-color ---
     Q.push(
       makeColorPattern(
-        "Last one! Which color finishes the diagonal pattern?",
+        "Which color finishes the diagonal pattern?",
         diagStripes(5, [C.pink, C.blue, C.yellow, C.green]),
         5,
         { x: 3, y: 1 },
@@ -428,7 +491,194 @@
       )
     );
 
-    return Q;
+    // --- 13. Pattern Completion: 3x3 two-color checker ---
+    Q.push(
+      makeColorPattern(
+        "Find the missing tile.",
+        checker(3, C.orange, C.blue),
+        3,
+        { x: 1, y: 1 },
+        [C.orange, C.blue, C.pink, C.green]
+      )
+    );
+
+    // --- 14. Pattern Completion: 4-wide vertical stripes ---
+    Q.push(
+      makeColorPattern(
+        "Which color fits the stripes?",
+        vStripes(4, [C.purple, C.yellow]),
+        4,
+        { x: 2, y: 1 },
+        [C.purple, C.yellow, C.pink, C.teal]
+      )
+    );
+
+    // --- 15. Reasoning by Analogy: color change (different colors) ---
+    Q.push(
+      makeMatrix(
+        "The shapes change color. Which piece fits?",
+        [
+          [
+            { kind: "triangle", color: C.yellow },
+            { kind: "triangle", color: C.pink },
+          ],
+          [{ kind: "star", color: C.yellow }, null],
+        ],
+        { x: 1, y: 1 },
+        shuffleSpecs([
+          { kind: "star", color: C.pink }, // correct
+          { kind: "star", color: C.yellow },
+          { kind: "triangle", color: C.pink },
+          { kind: "star", color: C.blue },
+        ])
+      )
+    );
+
+    // --- 16. Reasoning by Analogy: shapes get smaller ---
+    Q.push(
+      makeMatrix(
+        "The shapes get smaller. Which piece fits?",
+        [
+          [
+            { kind: "square", color: C.green, scale: BG },
+            { kind: "square", color: C.green, scale: SM },
+          ],
+          [{ kind: "heart", color: C.red, scale: BG }, null],
+        ],
+        { x: 1, y: 1 },
+        shuffleSpecs([
+          { kind: "heart", color: C.red, scale: SM }, // correct
+          { kind: "heart", color: C.red, scale: BG },
+          { kind: "square", color: C.red, scale: SM },
+          { kind: "circle", color: C.red, scale: SM },
+        ])
+      )
+    );
+
+    // --- 17. Serial Reasoning: counting up 1, 2, 3, ? ---
+    Q.push(
+      makeSeries(
+        "How many dots come next?",
+        [
+          { kind: "dots", count: 1, color: C.blue },
+          { kind: "dots", count: 2, color: C.blue },
+          { kind: "dots", count: 3, color: C.blue },
+          null,
+        ],
+        shuffleSpecs([
+          { kind: "dots", count: 4, color: C.blue }, // correct
+          { kind: "dots", count: 2, color: C.blue },
+          { kind: "dots", count: 3, color: C.blue },
+          { kind: "dots", count: 1, color: C.blue },
+        ])
+      )
+    );
+
+    // --- 18. Serial Reasoning: repeating color pattern ---
+    Q.push(
+      makeSeries(
+        "Which color comes next in the row?",
+        [
+          { kind: "square", color: C.red },
+          { kind: "square", color: C.blue },
+          { kind: "square", color: C.red },
+          null,
+        ],
+        shuffleSpecs([
+          { kind: "square", color: C.blue }, // correct
+          { kind: "square", color: C.red },
+          { kind: "square", color: C.green },
+          { kind: "circle", color: C.blue },
+        ])
+      )
+    );
+
+    // --- 19. Serial Reasoning: arrow turning a quarter each step ---
+    Q.push(
+      makeSeries(
+        "The arrow keeps turning. Which way does it point next?",
+        [
+          { kind: "arrow", color: C.purple, rot: 0 },
+          { kind: "arrow", color: C.purple, rot: 90 },
+          { kind: "arrow", color: C.purple, rot: 180 },
+          null,
+        ],
+        shuffleSpecs([
+          { kind: "arrow", color: C.purple, rot: 270 }, // correct
+          { kind: "arrow", color: C.purple, rot: 0 },
+          { kind: "arrow", color: C.purple, rot: 90 },
+          { kind: "arrow", color: C.purple, rot: 180 },
+        ])
+      )
+    );
+
+    // --- 20. Spatial Visualization: turn the shape a quarter (90) ---
+    Q.push(
+      makeMatrix(
+        "The top shape is turned. Turn the bottom shape the same way.",
+        [
+          [
+            { kind: "arrow", color: C.teal, rot: 0 },
+            { kind: "arrow", color: C.teal, rot: 90 },
+          ],
+          [{ kind: "flag", color: C.orange, rot: 0 }, null],
+        ],
+        { x: 1, y: 1 },
+        shuffleSpecs([
+          { kind: "flag", color: C.orange, rot: 90 }, // correct
+          { kind: "flag", color: C.orange, rot: 0 },
+          { kind: "flag", color: C.orange, rot: 180 },
+          { kind: "arrow", color: C.orange, rot: 90 },
+        ]),
+        "Spatial Visualization"
+      )
+    );
+
+    // --- 21. Spatial Visualization: turn the shape upside down (180) ---
+    Q.push(
+      makeMatrix(
+        "The top shape is flipped over. Do the same to the bottom shape.",
+        [
+          [
+            { kind: "flag", color: C.pink, rot: 0 },
+            { kind: "flag", color: C.pink, rot: 180 },
+          ],
+          [{ kind: "arrow", color: C.blue, rot: 0 }, null],
+        ],
+        { x: 1, y: 1 },
+        shuffleSpecs([
+          { kind: "arrow", color: C.blue, rot: 180 }, // correct
+          { kind: "arrow", color: C.blue, rot: 0 },
+          { kind: "arrow", color: C.blue, rot: 90 },
+          { kind: "flag", color: C.blue, rot: 180 },
+        ]),
+        "Spatial Visualization"
+      )
+    );
+
+    // --- 22. Spatial Visualization: quarter turn, arrow base ---
+    Q.push(
+      makeMatrix(
+        "The shape is turned. Which piece shows the same turn?",
+        [
+          [
+            { kind: "flag", color: C.green, rot: 0 },
+            { kind: "flag", color: C.green, rot: 90 },
+          ],
+          [{ kind: "arrow", color: C.red, rot: 0 }, null],
+        ],
+        { x: 1, y: 1 },
+        shuffleSpecs([
+          { kind: "arrow", color: C.red, rot: 90 }, // correct
+          { kind: "arrow", color: C.red, rot: 270 },
+          { kind: "arrow", color: C.red, rot: 0 },
+          { kind: "flag", color: C.red, rot: 90 },
+        ]),
+        "Spatial Visualization"
+      )
+    );
+
+    return shuffle(Q);
   }
 
   // Shuffle option specs while remembering which is correct (first item).
