@@ -160,7 +160,9 @@
       btn.classList.add("wrong");
       feedbackEmoji.textContent = "💡";
       feedbackText.textContent =
-        TRY_AGAIN[Math.floor(Math.random() * TRY_AGAIN.length)] + " The glowing one was right.";
+        TRY_AGAIN[Math.floor(Math.random() * TRY_AGAIN.length)] + " Here is the right piece.";
+      // show the correct answer by flying ITS tile into the hole
+      animateFill(allBtns[q.answer]);
       speak(feedbackText.textContent);
     }
 
