@@ -3,7 +3,7 @@
   "private": true,
   "description": "NNAT3 Level A practice game — static site",
   "scripts": {
-    "test": "node test/play.js"
+    "test": "node test/play.js && node test/probe.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"
