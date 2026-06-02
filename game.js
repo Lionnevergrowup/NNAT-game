@@ -51,22 +51,32 @@
   // ---- Settings (persisted) -------------------------------------------
   const DEFAULTS = {
     count: 10,
-    types: ["pattern", "analogy", "serial", "spatial"],
+    level: "A",
+    types: ["pattern", "analogy"],
     voice: true,
     speed: "normal",
     sfx: true,
     fx: true,
   };
+  const levelTypes = (l) => (window.NNAT && NNAT.levelTypes ? NNAT.levelTypes(l) : ["pattern", "analogy"]);
+
   let settings = loadSettings();
 
+  function sanitizeTypes(s) {
+    const avail = levelTypes(s.level);
+    let t = (Array.isArray(s.types) ? s.types : []).filter((x) => avail.indexOf(x) !== -1);
+    if (!t.length) t = avail.slice();
+    s.types = t;
+    return s;
+  }
   function loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem("nnat-settings")) || {};
       const s = Object.assign({}, DEFAULTS, saved);
-      if (!Array.isArray(s.types) || !s.types.length) s.types = DEFAULTS.types.slice();
-      return s;
+      if (!levelTypes(s.level).length) s.level = "A";
+      return sanitizeTypes(s);
     } catch (e) {
-      return Object.assign({}, DEFAULTS, { types: DEFAULTS.types.slice() });
+      return sanitizeTypes(Object.assign({}, DEFAULTS, { types: DEFAULTS.types.slice() }));
     }
   }
   function saveSettings() {
@@ -185,8 +195,8 @@
   // ---- Stats / progress (persisted) -----------------------------------
   function freshStats() {
     const byType = {};
-    ALL_TYPES.forEach((t) => (byType[t] = { a: 0, c: 0 }));
-    return { games: 0, answered: 0, correct: 0, stars: 0, bestStreak: 0, byType, recent: [] };
+    ALL_TYPES.forEach((t) => (byType[t] = { a: 0, c: 0, ms: 0 }));
+    return { games: 0, answered: 0, correct: 0, stars: 0, bestStreak: 0, totalMs: 0, byType, recent: [] };
   }
   let stats = loadStats();
   function loadStats() {
@@ -196,9 +206,11 @@
       const s = Object.assign(freshStats(), saved);
       const bt = freshStats().byType;
       ALL_TYPES.forEach((t) => {
-        if (saved.byType && saved.byType[t]) bt[t] = { a: saved.byType[t].a || 0, c: saved.byType[t].c || 0 };
+        if (saved.byType && saved.byType[t])
+          bt[t] = { a: saved.byType[t].a || 0, c: saved.byType[t].c || 0, ms: saved.byType[t].ms || 0 };
       });
       s.byType = bt;
+      s.totalMs = saved.totalMs || 0;
       s.recent = Array.isArray(saved.recent) ? saved.recent.slice(-10) : [];
       return s;
     } catch (e) {
@@ -210,12 +222,14 @@
       localStorage.setItem("nnat-stats", JSON.stringify(stats));
     } catch (e) {}
   }
-  function recordAnswer(type, correct) {
+  function recordAnswer(type, correct, ms) {
     stats.answered += 1;
     if (correct) stats.correct += 1;
-    if (!stats.byType[type]) stats.byType[type] = { a: 0, c: 0 };
+    stats.totalMs += ms || 0;
+    if (!stats.byType[type]) stats.byType[type] = { a: 0, c: 0, ms: 0 };
     stats.byType[type].a += 1;
     if (correct) stats.byType[type].c += 1;
+    stats.byType[type].ms += ms || 0;
     saveStats();
   }
   function recordGame(score, total, starsEarned, best) {
@@ -231,9 +245,12 @@
   const PRAISE = ["Awesome!", "Great job!", "You got it!", "Nice work!", "Yes!", "Super!", "Brilliant!"];
   const TRY_AGAIN = ["Good try!", "Almost!", "Keep going!"];
 
+  let qStart = 0; // timestamp when the current question was shown
+  const nowMs = () => (window.performance && performance.now ? performance.now() : Date.now());
+
   function startGame() {
     stopSpeaking();
-    const deck = NNAT.buildQuestions({ count: settings.count, types: settings.types });
+    const deck = NNAT.buildQuestions({ count: settings.count, types: settings.types, level: settings.level });
     questions = deck.slice(0, Math.min(settings.count, deck.length));
     index = 0;
     score = 0;
@@ -281,6 +298,11 @@
     });
 
     speak(q.prompt);
+    qStart = nowMs(); // start the per-question timer
+
+    // optional render hook (used by the automated playthrough tests; no-op in
+    // production where window.__onRender is undefined)
+    if (window.__onRender) window.__onRender(q, index, questions.length);
   }
 
   function bounceMascot() {
@@ -295,7 +317,8 @@
 
     const q = questions[index];
     const correct = i === q.answer;
-    recordAnswer(q.type || "Puzzle", correct);
+    const dt = Math.max(0, nowMs() - qStart);
+    recordAnswer(q.type || "Puzzle", correct, dt);
     const allBtns = Array.from(optionsEl.children);
 
     allBtns.forEach((b, bi) => {
@@ -331,6 +354,7 @@
       sfx("wrong");
       animateFill(btn, true);
       speak(feedbackText.textContent);
+      scheduleSimilar(q); // gently follow up with similar-but-different items
     }
 
     nextBtn.textContent = index === questions.length - 1 ? "See My Stars ⭐" : "Next ▶";
@@ -392,6 +416,27 @@
       fly.classList.add("landed");
       setTimeout(() => fly.remove(), 160);
     }, 620);
+  }
+
+  // After a wrong answer, replace a couple of upcoming questions with
+  // same-type, same-subtype variations so the child gets another chance to
+  // generalise the idea (举一反三). Keeps the total count unchanged.
+  function scheduleSimilar(q) {
+    if (!q || !q.g || !window.NNAT || !NNAT.makeSimilar) return;
+    const existing = new Set(questions.map((x) => x.stimulus));
+    [2, 4].forEach((offset) => {
+      const target = index + offset;
+      if (target >= questions.length) return;
+      for (let tries = 0; tries < 8; tries++) {
+        const sim = NNAT.makeSimilar(q, settings.level);
+        if (!existing.has(sim.stimulus)) {
+          existing.delete(questions[target].stimulus);
+          questions[target] = sim;
+          existing.add(sim.stimulus);
+          break;
+        }
+      }
+    });
   }
 
   function next() {
@@ -458,7 +503,20 @@
     });
   }
 
+  const LEVEL_NOTE = {
+    A: "Kindergarten · Patterns & Analogies",
+    B: "Grade 1 · adds Sequences (Serial Reasoning)",
+    C: "Grade 2 · adds Turns & Combine (Spatial)",
+  };
   function renderSettings() {
+    setActive("set-level", "level", settings.level, false);
+    $("level-note").textContent = LEVEL_NOTE[settings.level] || "";
+    // only show puzzle types available at this level
+    const avail = levelTypes(settings.level);
+    Array.from($("set-types").children).forEach((chip) => {
+      const t = chip.dataset.type;
+      chip.classList.toggle("hidden", avail.indexOf(t) === -1);
+    });
     setActive("set-count", "count", settings.count, false);
     setActive("set-types", "type", settings.types, true);
     setActive("set-voice", "voice", settings.voice ? "on" : "off", false);
@@ -483,6 +541,16 @@
   }
 
   function wireChips() {
+    $("set-level").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (!c) return;
+      settings.level = c.dataset.level;
+      settings.types = levelTypes(settings.level); // enable all types for the level
+      saveSettings();
+      renderSettings();
+      sfx("tap");
+    });
+
     $("set-count").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
@@ -691,19 +759,37 @@
     $("trend-section").classList.toggle("hidden", !trend);
     $("trend-chart").innerHTML = trend;
 
+    const avgSecs = stats.answered ? (stats.totalMs / stats.answered / 1000).toFixed(1) : "0";
     $("stat-summary").innerHTML = [
       statCard("🎮", stats.games, "Games"),
       statCard("❓", stats.answered, "Answered"),
       statCard("🎯", pct(stats.correct, stats.answered) + "%", "Accuracy"),
       statCard("🔥", stats.bestStreak, "Best streak"),
+      statCard("⏱", avgSecs + "s", "Avg time"),
     ].join("");
 
+    // which type is slowest on average? (only types actually attempted)
+    let slowest = null;
+    let slowAvg = -1;
+    ALL_TYPES.forEach((t) => {
+      const d = stats.byType[t];
+      if (d && d.a) {
+        const avg = d.ms / d.a;
+        if (avg > slowAvg) {
+          slowAvg = avg;
+          slowest = t;
+        }
+      }
+    });
+
     $("type-bars").innerHTML = ALL_TYPES.map((t) => {
-      const d = stats.byType[t] || { a: 0, c: 0 };
+      const d = stats.byType[t] || { a: 0, c: 0, ms: 0 };
       const p = pct(d.c, d.a);
+      const avg = d.a ? (d.ms / d.a / 1000).toFixed(1) + "s" : "";
+      const slow = d.a && t === slowest && ALL_TYPES.filter((x) => stats.byType[x].a).length > 1;
       return `<div class="bar-row">
-          <div class="bar-top"><span>${TYPE_SHORT[t] || t}</span><span class="bar-val">${
-        d.a ? p + "% · " + d.c + "/" + d.a : "—"
+          <div class="bar-top"><span>${TYPE_SHORT[t] || t}${slow ? ' <span class="slow-tag">🐢 slowest</span>' : ""}</span><span class="bar-val">${
+        d.a ? p + "% · " + d.c + "/" + d.a + (avg ? " · " + avg : "") : "—"
       }</span></div>
           <div class="bar"><div class="bar-fill" style="width:${d.a ? p : 0}%"></div></div>
         </div>`;

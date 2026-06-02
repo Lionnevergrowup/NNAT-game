@@ -24,10 +24,7 @@ async function playGame(env, strategy) {
     note(`After Start, expected quiz-screen but got ${visibleScreen(document)}`);
     return null;
   }
-  const deck = decks[decks.length - 1];
   const count = parseInt($("q-total").textContent, 10);
-  const qs = deck.slice(0, count);
-
   let expectedScore = 0;
   let expScreenTotal = count;
 
@@ -39,7 +36,8 @@ async function playGame(env, strategy) {
     const opts = Array.from($("options").children);
     if (opts.length !== 4) note(`Q${i + 1}: expected 4 options, got ${opts.length}`);
 
-    const ans = qs[i].answer;
+    // read the LIVE current question (adaptive may have swapped it in)
+    const ans = env.live.q.answer;
     let choiceIdx;
     if (strategy === "correct") choiceIdx = ans;
     else if (strategy === "wrong") choiceIdx = (ans + 1) % 4;
@@ -105,7 +103,7 @@ async function playGame(env, strategy) {
   if (visibleScreen(d) !== "progress-screen") note(`Open progress from results -> ${visibleScreen(d)}`);
   else {
     const cards = d.querySelectorAll("#stat-summary .stat-card").length;
-    if (cards !== 4) note(`Expected 4 summary cards, got ${cards}`);
+    if (cards !== 5) note(`Expected 5 summary cards, got ${cards}`);
     const bars = d.querySelectorAll("#type-bars .bar-row").length;
     if (bars !== 4) note(`Expected 4 type bars, got ${bars}`);
     ok(`Progress: ${cards} cards, ${bars} type bars, recent rows ${d.querySelectorAll("#recent-list .recent-row").length}`);
@@ -116,12 +114,14 @@ async function playGame(env, strategy) {
   env = launch();
   click(env.window, env.document.getElementById("open-settings"));
   if (visibleScreen(env.document) !== "settings-screen") note("Open settings failed");
-  // choose 20 questions, only spatial
+  // Level C unlocks spatial; choose 20 questions, only spatial
+  click(env.window, env.document.querySelector('#set-level [data-level="C"]'));
   click(env.window, env.document.querySelector('#set-count [data-count="20"]'));
   env.document.querySelectorAll("#set-types .chip").forEach((c) => {
     if (c.dataset.type !== "spatial" && c.classList.contains("active")) click(env.window, c);
   });
   const saved = JSON.parse(env.window.localStorage.getItem("nnat-settings"));
+  if (saved.level !== "C") note(`level not saved (got ${saved.level})`);
   if (saved.count !== 20) note(`count not saved (got ${saved.count})`);
   if (!(saved.types.length === 1 && saved.types[0] === "spatial")) note(`types not saved: ${JSON.stringify(saved.types)}`);
   else ok(`settings saved: count=${saved.count}, types=${JSON.stringify(saved.types)}`);
@@ -220,6 +220,70 @@ async function playGame(env, strategy) {
   listen = env.document.getElementById("listen-btn");
   if (listen.style.display === "none") note("Listen button stays hidden after turning voice on");
   else ok("Listen visible when read-aloud on");
+
+  // ---- Playthrough 9: levels gate item types correctly ----
+  console.log("\n[Playthrough 9] Levels unlock the right item types");
+  const expectByLevel = {
+    A: new Set(["Pattern Completion", "Reasoning by Analogy"]),
+    B: new Set(["Pattern Completion", "Reasoning by Analogy", "Serial Reasoning"]),
+    C: new Set(["Pattern Completion", "Reasoning by Analogy", "Serial Reasoning", "Spatial Visualization"]),
+  };
+  for (const L of ["A", "B", "C"]) {
+    env = launch();
+    click(env.window, env.document.getElementById("open-settings"));
+    click(env.window, env.document.querySelector(`#set-level [data-level="${L}"]`));
+    click(env.window, env.document.querySelector('#set-count [data-count="48"]'));
+    click(env.window, env.document.getElementById("settings-done"));
+    click(env.window, env.document.getElementById("start-btn"));
+    const dk = env.decks[env.decks.length - 1];
+    const tot = parseInt(env.document.getElementById("q-total").textContent, 10);
+    const tset = new Set(dk.slice(0, tot).map((q) => q.type));
+    const within = [...tset].every((t) => expectByLevel[L].has(t));
+    // serial must NOT appear in A; spatial must NOT appear in A or B
+    const leak = (L === "A" && (tset.has("Serial Reasoning") || tset.has("Spatial Visualization"))) ||
+      (L === "B" && tset.has("Spatial Visualization"));
+    if (!within || leak) note(`Level ${L} produced types ${[...tset]}`);
+    else ok(`Level ${L}: ${[...tset].length} types, all allowed`);
+  }
+
+  // ---- Playthrough 10: per-question timer is recorded ----
+  console.log("\n[Playthrough 10] Timing recorded per type");
+  env = launch();
+  await playGame(env, "mixed");
+  const st = JSON.parse(env.window.localStorage.getItem("nnat-stats"));
+  if (!(st.totalMs >= 0 && typeof st.totalMs === "number")) note("totalMs not tracked");
+  const anyTypeMs = Object.values(st.byType).some((d) => d.a > 0 && typeof d.ms === "number");
+  if (!anyTypeMs) note("per-type ms not tracked");
+  else ok(`timing tracked: totalMs=${Math.round(st.totalMs)}, byType ms present`);
+  click(env.window, env.document.getElementById("open-progress-2"));
+  const avgCard = [...env.document.querySelectorAll("#stat-summary .stat-card")].some((c) =>
+    c.textContent.includes("Avg time")
+  );
+  if (!avgCard) note("Avg time card missing on Progress");
+  else ok("Avg time card shown on Progress");
+
+  // ---- Playthrough 11: all-wrong at Level C still completes at right count ----
+  console.log("\n[Playthrough 11] Adaptive follow-ups keep the game stable");
+  env = launch();
+  click(env.window, env.document.getElementById("open-settings"));
+  click(env.window, env.document.querySelector('#set-level [data-level="C"]'));
+  click(env.window, env.document.querySelector('#set-count [data-count="20"]'));
+  click(env.window, env.document.getElementById("settings-done"));
+  // play 20 all-wrong (triggers scheduleSimilar repeatedly)
+  click(env.window, env.document.getElementById("start-btn"));
+  let answered = 0;
+  for (let i = 0; i < 20; i++) {
+    const optsEl = env.document.getElementById("options");
+    if (!optsEl.children.length) break;
+    // click option 0 then, if it was correct, it still counts; we just need to advance
+    click(env.window, optsEl.children[0]);
+    answered++;
+    await tick(env.window, 60);
+    click(env.window, env.document.getElementById("next-btn"));
+  }
+  if (answered !== 20) note(`Adaptive run answered ${answered} (expected 20)`);
+  if (visibleScreen(env.document) !== "result-screen") note(`Adaptive run ended on ${visibleScreen(env.document)}`);
+  else ok(`Adaptive run completed all 20 and reached results`);
 
   console.log(`\n=== ${findings.length} finding(s) ===`);
   findings.forEach((f) => console.log(" - " + f));

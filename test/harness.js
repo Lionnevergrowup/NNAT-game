@@ -86,9 +86,17 @@ function launch(opts = {}) {
     return d;
   };
 
+  // capture the live current question (survives adaptive queue mutations)
+  const live = { q: null, i: -1, total: 0 };
+  window.__onRender = (q, i, total) => {
+    live.q = q;
+    live.i = i;
+    live.total = total;
+  };
+
   window.eval(gjs);
 
-  return { dom, window, document, spoken, tones, decks };
+  return { dom, window, document, spoken, tones, decks, live };
 }
 
 // helpers --------------------------------------------------------------

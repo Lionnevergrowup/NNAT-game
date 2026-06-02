@@ -7,16 +7,33 @@ stars, and a final score. No reading required — great for ages 4–6.
 > Not affiliated with or endorsed by NCS Pearson. "NNAT" is a trademark of its
 > respective owner. This is an independent practice tool for educational use.
 
-## Question types
+## Levels & question types
 
-The game covers all four NNAT3 item types, with the difficulty kept at Level A:
+The game mirrors the official NNAT3 structure. Each **level** unlocks the item
+types that appear at that grade (choose it in Settings):
+
+| Level | Grade | Item types |
+| --- | --- | --- |
+| **A** | Kindergarten | Pattern Completion, Reasoning by Analogy |
+| **B** | Grade 1 | + Serial Reasoning |
+| **C** | Grade 2 | + Spatial Visualization |
 
 | Type | What the child does |
 | --- | --- |
-| **Pattern Completion** | A big picture has a missing square — pick the tile that completes the pattern (checkerboards, stripes, diagonals). |
-| **Reasoning by Analogy** | Shapes change in a consistent way (color, size, or shape) across a small grid — pick the piece that follows the same rule. |
-| **Serial Reasoning** | A row of pictures changes step by step (counting up, repeating colors, an arrow turning) — pick what comes next. |
-| **Spatial Visualization** | A shape is turned (a quarter turn or flipped over) — pick the option that shows the same turn. |
+| **Pattern Completion** | A picture has a missing square — pick the tile that completes it (checkerboards, stripes, diagonals; shape grids at higher levels). |
+| **Reasoning by Analogy** | Shapes change consistently across a 2×2 grid (color, size, shape, rotation, or two things at once) — pick the piece that follows the rule. |
+| **Serial Reasoning** | A 3×3 grid progresses across rows/columns (shape flow, color flow, rotation, or both) — pick the missing bottom-right piece. |
+| **Spatial Visualization** | Turn a shape the same way as an example, or **combine** two shapes and pick the result. |
+
+Questions are generated procedurally, so the bank is effectively unlimited and
+no puzzle repeats within a round.
+
+## Adaptive practice (举一反三)
+
+When a child answers a question **wrong**, the game quietly slips a couple of
+**similar-but-different** questions of the same kind a few steps later, so they
+get another chance to apply the idea — without changing how many questions the
+round has.
 
 Questions are **generated procedurally** from a large parameter space (shapes ×
 colors × patterns × sizes × rotations × positions), so every round is different
@@ -56,9 +73,9 @@ option lives (all choices are remembered between visits):
 A 📊 **Progress** page (on the start and results screens) gives a parent/learner
 view of play history, stored locally in the browser:
 
-- Summary cards: games played, questions answered, overall accuracy, best streak.
+- Summary cards: games played, questions answered, overall accuracy, best streak, **average time per question**.
 - **Accuracy trend** — a small SVG line chart of accuracy over recent games.
-- **Accuracy by puzzle type** bars for each of the four types.
+- **Accuracy & speed by puzzle type** — bars with each type's accuracy and average answer time, flagging the **slowest** type (🐢).
 - Recent games **grouped by date** (Today / Yesterday / date) with score and stars.
 - A **Reset stats** button to clear the history.
 

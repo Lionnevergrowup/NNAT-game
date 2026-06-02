@@ -90,9 +90,24 @@
     return s;
   }
 
-  // Render any cell spec ({kind,color,scale,rot} or {kind:'dots',count,color}).
+  // A grey plus sign (used in "combine these shapes" spatial items).
+  function plusSign(cellSize) {
+    const c = cellSize / 2;
+    const a = cellSize * 0.16;
+    const t = cellSize * 0.05;
+    return `<rect x="${c - a}" y="${c - t}" width="${2 * a}" height="${2 * t}" rx="${t}" fill="#c7cbe0"/><rect x="${c - t}" y="${c - a}" width="${2 * t}" height="${2 * a}" rx="${t}" fill="#c7cbe0"/>`;
+  }
+
+  // Render any cell spec:
+  //  {kind:'dots',count,color} · {kind:'plus'} · {kind:'combo',shapes:[...]} ·
+  //  {kind,color,scale,rot}
   function renderSpec(spec, cellSize) {
     if (spec.kind === "dots") return dots(spec.count, spec.color, cellSize);
+    if (spec.kind === "plus") return plusSign(cellSize);
+    if (spec.kind === "combo")
+      return spec.shapes
+        .map((s) => shapeScaled(s.kind, s.color, cellSize, s.scale || 0.92, s.rot))
+        .join("");
     return shapeScaled(spec.kind, spec.color, cellSize, spec.scale, spec.rot);
   }
 
@@ -365,9 +380,12 @@
     }
     let guard = 0;
     while (out.length < 4 && guard++ < 80) {
-      const base = Object.assign({}, correct);
+      let base = Object.assign({}, correct);
       if (base.kind === "dots") base.count = randInt(1, 4);
-      else {
+      else if (base.kind === "combo") {
+        base = JSON.parse(JSON.stringify(correct));
+        if (base.shapes[0]) base.shapes[0].color = pick(COLORS);
+      } else {
         base.color = pick(COLORS);
         if (Math.random() < 0.5) base.kind = pick(SHAPES);
       }
@@ -380,24 +398,74 @@
     return shuffleSpecs(out);
   }
 
-  // ---- Pattern Completion ----
-  function genPattern() {
-    const style = pick(["checker", "v", "h", "diag"]);
-    let grid, n;
-    if (style === "checker") {
-      n = randInt(2, 5);
+  // Shuffle option specs while remembering which is correct (first item).
+  function shuffleSpecs(specs) {
+    const tagged = specs.map((s, i) => ({ ...s, correct: i === 0 }));
+    return shuffle(tagged);
+  }
+
+  // tag a built question with its generator + subtype so we can make a
+  // "similar but different" follow-up later (adaptive practice).
+  function tagify(q, g, sub) {
+    q.g = g;
+    q.sub = sub;
+    return q;
+  }
+  function nForLevel(level) {
+    return level === "A" ? randInt(2, 3) : level === "B" ? randInt(3, 4) : randInt(4, 5);
+  }
+  function otherColor(c) {
+    return pick(COLORS.filter((x) => x !== c));
+  }
+  function otherShape(exclude) {
+    return pick(SHAPES.filter((s) => exclude.indexOf(s) === -1));
+  }
+
+  // =====================================================================
+  // Pattern Completion  (NNAT levels A–E)
+  // =====================================================================
+  function patternSubs(level) {
+    const base = ["checker", "vstripe", "hstripe"];
+    if (level === "A") return base;
+    if (level === "B") return base.concat("diag");
+    return base.concat("diag", "shapegrid");
+  }
+  function genPattern(level, forceSub) {
+    const subs = patternSubs(level);
+    const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
+
+    if (sub === "shapegrid") {
+      const n = Math.min(nForLevel(level), 4);
+      const [sA, sB] = pickN(SHAPES, 2);
+      const color = pick(COLORS);
+      const cells = [];
+      for (let y = 0; y < n; y++) {
+        cells.push([]);
+        for (let x = 0; x < n; x++) cells[y].push({ kind: (x + y) % 2 === 0 ? sA : sB, color });
+      }
+      const hole = { x: randInt(0, n - 1), y: randInt(0, n - 1) };
+      const correctSpec = cells[hole.y][hole.x];
+      cells[hole.y][hole.x] = null;
+      const distractors = [
+        { kind: correctSpec.kind === sA ? sB : sA, color },
+        { kind: correctSpec.kind, color: otherColor(color) },
+        { kind: otherShape([sA, sB]), color },
+      ];
+      return tagify(
+        makeMatrix("Find the missing piece of the pattern.", cells, hole, distinctOptions(correctSpec, distractors), "Pattern Completion"),
+        "pattern",
+        sub
+      );
+    }
+
+    const n = nForLevel(level);
+    let grid;
+    if (sub === "checker") {
       const [a, b] = pickN(COLORS, 2);
       grid = checker(n, a, b);
-    } else if (style === "v") {
-      n = randInt(3, 5);
-      grid = vStripes(n, pickN(COLORS, 2));
-    } else if (style === "h") {
-      n = randInt(3, 5);
-      grid = hStripes(n, pickN(COLORS, 2));
-    } else {
-      n = randInt(3, 5);
-      grid = diagStripes(n, pickN(COLORS, randInt(3, 4)));
-    }
+    } else if (sub === "vstripe") grid = vStripes(n, pickN(COLORS, 2));
+    else if (sub === "hstripe") grid = hStripes(n, pickN(COLORS, 2));
+    else grid = diagStripes(n, pickN(COLORS, level === "C" ? randInt(3, 4) : 3));
     const hole = { x: randInt(0, n - 1), y: randInt(0, n - 1) };
     const correct = grid[hole.y][hole.x];
     const distractors = pickN(COLORS, 3, [correct]);
@@ -405,31 +473,32 @@
       "One piece is missing. Which color belongs in the empty box?",
       "Find the missing tile.",
       "Which color completes the pattern?",
-      "Look at the pattern. Which piece fits the empty box?",
     ]);
-    return makeColorPattern(prompt, grid, n, hole, distractors);
+    return tagify(makeColorPattern(prompt, grid, n, hole, distractors), "pattern", sub);
   }
 
-  // ---- Reasoning by Analogy (2x2) ----
-  function genAnalogy() {
-    const transform = pick(["color", "size", "shape"]);
+  // =====================================================================
+  // Reasoning by Analogy  (NNAT levels A–G)  — 2×2 matrix
+  // =====================================================================
+  function analogySubs(level) {
+    const base = ["color", "size", "shape"];
+    if (level === "A") return base;
+    if (level === "B") return base.concat("rotate");
+    return base.concat("rotate", "multi");
+  }
+  function genAnalogy(level, forceSub) {
+    const subs = analogySubs(level);
+    const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
     let cells, correct, distractors, prompt;
 
-    if (transform === "color") {
+    if (sub === "color") {
       const [c0, c1, c2] = pickN(COLORS, 3);
       const [k0, k1] = pickN(SHAPES, 2);
-      cells = [
-        [{ kind: k0, color: c0 }, { kind: k0, color: c1 }],
-        [{ kind: k1, color: c0 }, null],
-      ];
+      cells = [[{ kind: k0, color: c0 }, { kind: k0, color: c1 }], [{ kind: k1, color: c0 }, null]];
       correct = { kind: k1, color: c1 };
-      distractors = [
-        { kind: k1, color: c0 },
-        { kind: k0, color: c1 },
-        { kind: k1, color: c2 },
-      ];
+      distractors = [{ kind: k1, color: c0 }, { kind: k0, color: c1 }, { kind: k1, color: c2 }];
       prompt = "The shapes change color. Which piece is missing?";
-    } else if (transform === "size") {
+    } else if (sub === "size") {
       const big = Math.random() < 0.5;
       const sA = big ? SM : BG;
       const sB = big ? BG : SM;
@@ -443,87 +512,143 @@
       distractors = [
         { kind: k1, color: c1, scale: sA },
         { kind: k0, color: c1, scale: sB },
-        { kind: k1, color: pick(COLORS.filter((c) => c !== c1)), scale: sB },
+        { kind: k1, color: otherColor(c1), scale: sB },
       ];
       prompt = big ? "The shapes get bigger. Which piece is missing?" : "The shapes get smaller. Which piece is missing?";
-    } else {
+    } else if (sub === "shape") {
       const [s0, s1, s2] = pickN(SHAPES, 3);
       const [c0, c1] = pickN(COLORS, 2);
-      cells = [
-        [{ kind: s0, color: c0 }, { kind: s1, color: c0 }],
-        [{ kind: s0, color: c1 }, null],
-      ];
+      cells = [[{ kind: s0, color: c0 }, { kind: s1, color: c0 }], [{ kind: s0, color: c1 }, null]];
       correct = { kind: s1, color: c1 };
-      distractors = [
-        { kind: s0, color: c1 },
-        { kind: s1, color: c0 },
-        { kind: s2, color: c1 },
-      ];
+      distractors = [{ kind: s0, color: c1 }, { kind: s1, color: c0 }, { kind: s2, color: c1 }];
       prompt = "Each column is the same shape. What completes the picture?";
+    } else if (sub === "rotate") {
+      const [k0, k1] = pickN(["arrow", "flag"], 2);
+      const [c0, c1] = pickN(COLORS, 2);
+      const ang = pick([90, 180, 270]);
+      cells = [
+        [{ kind: k0, color: c0, rot: 0 }, { kind: k0, color: c0, rot: ang }],
+        [{ kind: k1, color: c1, rot: 0 }, null],
+      ];
+      correct = { kind: k1, color: c1, rot: ang };
+      distractors = [
+        { kind: k1, color: c1, rot: 0 },
+        { kind: k1, color: c1, rot: pick([90, 180, 270].filter((a) => a !== ang)) },
+        { kind: k0, color: c1, rot: ang },
+      ];
+      prompt = "The shape is turned. Which piece is missing?";
+    } else {
+      // multi: shape AND size change across columns; color differs by row
+      const [s0, s1] = pickN(SHAPES, 2);
+      const [c0, c1] = pickN(COLORS, 2);
+      cells = [
+        [{ kind: s0, color: c0, scale: SM }, { kind: s1, color: c0, scale: BG }],
+        [{ kind: s0, color: c1, scale: SM }, null],
+      ];
+      correct = { kind: s1, color: c1, scale: BG };
+      distractors = [
+        { kind: s1, color: c1, scale: SM },
+        { kind: s0, color: c1, scale: BG },
+        { kind: s1, color: c0, scale: BG },
+      ];
+      prompt = "Two things change. Which piece is missing?";
     }
-    return makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors));
+    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors)), "analogy", sub);
   }
 
-  // ---- Serial Reasoning (a row that changes step by step) ----
-  function genSerial() {
-    const kind = pick(["count", "colorcycle", "rotation"]);
-    let row, correct, distractors, prompt;
+  // =====================================================================
+  // Serial Reasoning  (NNAT levels B–G)  — 3×3 grid, missing bottom-right
+  // =====================================================================
+  function serialSubs(level) {
+    const base = ["shapeflow", "colorflow", "rotate"];
+    return level === "C" ? base.concat("matrix2") : base;
+  }
+  function grid3(fn) {
+    const cells = [];
+    for (let r = 0; r < 3; r++) {
+      cells.push([]);
+      for (let c = 0; c < 3; c++) cells[r].push(r === 2 && c === 2 ? null : fn(r, c));
+    }
+    return cells;
+  }
+  function genSerial(level, forceSub) {
+    const subs = serialSubs(level);
+    const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
+    let cells, correct, distractors;
+    const prompt = "Which piece completes the grid?";
 
-    if (kind === "count") {
+    if (sub === "shapeflow") {
+      const order = pickN(SHAPES, 3);
       const color = pick(COLORS);
-      row = [
-        { kind: "dots", count: 1, color },
-        { kind: "dots", count: 2, color },
-        { kind: "dots", count: 3, color },
-        null,
-      ];
-      correct = { kind: "dots", count: 4, color };
-      distractors = [
-        { kind: "dots", count: 3, color },
-        { kind: "dots", count: 2, color },
-        { kind: "dots", count: 1, color },
-      ];
-      prompt = "How many dots come next?";
-    } else if (kind === "colorcycle") {
-      const [c1, c2, c3] = pickN(COLORS, 3);
+      cells = grid3((r, c) => ({ kind: order[c], color }));
+      correct = { kind: order[2], color };
+      distractors = [{ kind: order[0], color }, { kind: order[1], color }, { kind: otherShape(order), color }];
+    } else if (sub === "colorflow") {
+      const order = pickN(COLORS, 3);
       const k = pick(SHAPES);
-      row = [
-        { kind: k, color: c1 },
-        { kind: k, color: c2 },
-        { kind: k, color: c1 },
-        null,
-      ];
-      correct = { kind: k, color: c2 };
-      distractors = [
-        { kind: k, color: c1 },
-        { kind: k, color: c3 },
-        { kind: pick(SHAPES.filter((s) => s !== k)), color: c2 },
-      ];
-      prompt = "Which color comes next in the row?";
-    } else {
+      cells = grid3((r, c) => ({ kind: k, color: order[c] }));
+      correct = { kind: k, color: order[2] };
+      distractors = [{ kind: k, color: order[0] }, { kind: k, color: order[1] }, { kind: k, color: otherColor(order[0]) === order[1] ? otherColor(order[1]) : otherColor(order[0]) }];
+    } else if (sub === "rotate") {
       const shp = pick(["arrow", "flag"]);
       const color = pick(COLORS);
-      const r0 = pick([0, 90, 180, 270]);
-      const r = (a) => (r0 + a) % 360;
-      row = [
-        { kind: shp, color, rot: r(0) },
-        { kind: shp, color, rot: r(90) },
-        { kind: shp, color, rot: r(180) },
-        null,
-      ];
-      correct = { kind: shp, color, rot: r(270) };
+      const step = pick([90, 270]);
+      cells = grid3((r, c) => ({ kind: shp, color, rot: ((r * 3 + c) * step) % 360 }));
+      correct = { kind: shp, color, rot: (8 * step) % 360 };
+      distractors = [90, 180, 270]
+        .map((a) => ({ kind: shp, color, rot: a }))
+        .filter((d) => d.rot !== correct.rot)
+        .slice(0, 3);
+    } else {
+      // matrix2: shape by column AND color by row (two variables)
+      const sOrder = pickN(SHAPES, 3);
+      const cOrder = pickN(COLORS, 3);
+      cells = grid3((r, c) => ({ kind: sOrder[c], color: cOrder[r] }));
+      correct = { kind: sOrder[2], color: cOrder[2] };
       distractors = [
-        { kind: shp, color, rot: r(0) },
-        { kind: shp, color, rot: r(90) },
-        { kind: shp, color, rot: r(180) },
+        { kind: sOrder[2], color: cOrder[1] },
+        { kind: sOrder[1], color: cOrder[2] },
+        { kind: sOrder[0], color: cOrder[0] },
       ];
-      prompt = "The shape keeps turning. Which way does it point next?";
     }
-    return makeSeries(prompt, row, distinctOptions(correct, distractors));
+    return tagify(makeMatrix(prompt, cells, { x: 2, y: 2 }, distinctOptions(correct, distractors), "Serial Reasoning"), "serial", sub);
   }
 
-  // ---- Spatial Visualization (turn the shape the same way) ----
-  function genSpatial() {
+  // =====================================================================
+  // Spatial Visualization  (NNAT levels C–G)  — turn / combine shapes
+  // =====================================================================
+  function spatialSubs() {
+    return ["rotate", "combine"];
+  }
+  function genSpatial(level, forceSub) {
+    const subs = spatialSubs();
+    const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
+
+    if (sub === "combine") {
+      const [sA, sB] = pickN(SHAPES, 2);
+      const [cA, cB] = pickN(COLORS, 2);
+      const big = { scale: 0.95 };
+      const small = { scale: 0.5 };
+      const row = [
+        { kind: sA, color: cA },
+        { kind: "plus" },
+        { kind: sB, color: cB },
+        null,
+      ];
+      const correct = { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }, { kind: sB, color: cB, scale: small.scale }] };
+      const distractors = [
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }] },
+        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: big.scale }] },
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }, { kind: sB, color: cA, scale: small.scale }] },
+      ];
+      return tagify(
+        makeSeries("Put the two shapes together. Which piece do you get?", row, distinctOptions(correct, distractors), "Spatial Visualization"),
+        "spatial",
+        sub
+      );
+    }
+
+    // rotate: turn the bottom shape the same way as the top pair
     const angle = pick([90, 180, 270]);
     const [base, target] = shuffle(["arrow", "flag"]);
     const [c0, c1] = pickN(COLORS, 2);
@@ -532,61 +657,68 @@
       [{ kind: target, color: c1, rot: 0 }, null],
     ];
     const correct = { kind: target, color: c1, rot: angle };
-    const otherAngle = pick([90, 180, 270].filter((a) => a !== angle));
     const distractors = [
       { kind: target, color: c1, rot: 0 },
-      { kind: target, color: c1, rot: otherAngle },
+      { kind: target, color: c1, rot: pick([90, 180, 270].filter((a) => a !== angle)) },
       { kind: base, color: c1, rot: angle },
     ];
     const prompt =
       angle === 180
         ? "The top shape is flipped over. Do the same to the bottom shape."
         : "The top shape is turned. Turn the bottom shape the same way.";
-    return makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors), "Spatial Visualization");
+    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors), "Spatial Visualization"), "spatial", "rotate");
   }
 
-  // The generators draw from a huge parameter space (shapes × colors ×
-  // patterns × sizes × rotations × positions), so every round is different.
-  // We also de-duplicate within a round so no puzzle repeats in the same game.
-  const GENERATORS = {
-    pattern: genPattern,
-    analogy: genAnalogy,
-    serial: genSerial,
-    spatial: genSpatial,
+  // ---- registry & level structure (mirrors the official NNAT3) ----------
+  const GENERATORS = { pattern: genPattern, analogy: genAnalogy, serial: genSerial, spatial: genSpatial };
+  // Which item types appear at each level (A=K, B=Grade 1, C=Grade 2).
+  const LEVEL_TYPES = {
+    A: ["pattern", "analogy"],
+    B: ["pattern", "analogy", "serial"],
+    C: ["pattern", "analogy", "serial", "spatial"],
   };
 
-  // opts: { count?: number, types?: string[] } — count is how many the player
-  // wants; types limits which generators are used (defaults to all four).
+  // opts: { count?, types?, level? }
   function buildQuestions(opts) {
     opts = opts || {};
-    let types = (opts.types || []).filter((t) => GENERATORS[t]);
-    if (!types.length) types = Object.keys(GENERATORS);
+    const level = LEVEL_TYPES[opts.level] ? opts.level : "A";
+    const avail = LEVEL_TYPES[level];
+    let types = (opts.types || []).filter((t) => avail.indexOf(t) !== -1);
+    if (!types.length) types = avail.slice();
     const target = Math.max(1, opts.count || 48);
 
     const Q = [];
     const seen = new Set();
-    const add = (gen, count) => {
+    const add = (t, count) => {
       let made = 0;
       let guard = 0;
-      while (made < count && guard++ < count * 80) {
-        const q = gen();
+      while (made < count && guard++ < count * 120) {
+        const q = GENERATORS[t](level);
         if (seen.has(q.stimulus)) continue; // skip an identical puzzle
         seen.add(q.stimulus);
         Q.push(q);
         made++;
       }
     };
-    // generate an even share per chosen type, enough to cover the target
-    const perType = Math.ceil(target / types.length);
-    types.forEach((t) => add(GENERATORS[t], perType));
+    const per = Math.ceil(target / types.length);
+    types.forEach((t) => add(t, per));
     return shuffle(Q);
   }
 
-  // Shuffle option specs while remembering which is correct (first item).
-  function shuffleSpecs(specs) {
-    const tagged = specs.map((s, i) => ({ ...s, correct: i === 0 }));
-    return shuffle(tagged);
+  // Make a "similar but different" question of the same type & subtype —
+  // used to give gentle follow-ups after a wrong answer (举一反三).
+  function makeSimilar(q, level) {
+    const lvl = LEVEL_TYPES[level] ? level : "A";
+    if (!q || !GENERATORS[q.g]) return GENERATORS.pattern(lvl);
+    return GENERATORS[q.g](lvl, q.sub);
   }
 
-  global.NNAT = { buildQuestions };
+  global.NNAT = {
+    buildQuestions,
+    makeSimilar,
+    levels: Object.keys(LEVEL_TYPES),
+    levelTypes: function (l) {
+      return (LEVEL_TYPES[l] || []).slice();
+    },
+  };
 })(window);
