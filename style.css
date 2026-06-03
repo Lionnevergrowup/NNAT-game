@@ -138,6 +138,11 @@ body {
 /* ---------- results best streak ---------- */
 .best-streak { color: var(--muted); font-weight: 700; margin: -8px 0 18px; }
 
+/* ---------- home level chooser ---------- */
+.home-level { margin: 8px 0 2px; }
+.home-level-label { font-weight: 800; color: var(--muted); margin: 0 0 8px; }
+#home-level-note { min-height: 1.1em; margin-top: 8px; }
+
 /* ---------- home links row ---------- */
 .home-links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
 .home-links .btn-ghost { margin-top: 0; }

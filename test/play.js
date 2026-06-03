@@ -285,6 +285,31 @@ async function playGame(env, strategy) {
   if (visibleScreen(env.document) !== "result-screen") note(`Adaptive run ended on ${visibleScreen(env.document)}`);
   else ok(`Adaptive run completed all 20 and reached results`);
 
+  // ---- Playthrough 12: home-screen Level chooser unlocks the other types ----
+  console.log("\n[Playthrough 12] Home Level chooser");
+  env = launch();
+  // default level A → only 2 types
+  const homeA = env.document.querySelector("#home-level .chip.active");
+  if (!homeA || homeA.dataset.level !== "A") note(`Home level not A by default (got ${homeA && homeA.dataset.level})`);
+  // pick Level C on the start screen
+  click(env.window, env.document.querySelector('#home-level [data-level="C"]'));
+  const sv = JSON.parse(env.window.localStorage.getItem("nnat-settings"));
+  if (sv.level !== "C") note(`Home level pick did not save C (got ${sv.level})`);
+  if (sv.types.length !== 4) note(`Level C should enable 4 types, got ${sv.types.length}`);
+  // and it should reflect in Settings too
+  click(env.window, env.document.getElementById("open-settings"));
+  const setC = env.document.querySelector("#set-level .chip.active");
+  if (!setC || setC.dataset.level !== "C") note("Settings level not synced to C");
+  click(env.window, env.document.getElementById("settings-done"));
+  // starting now should include Serial + Spatial
+  click(env.window, env.document.getElementById("start-btn"));
+  const dk = env.decks[env.decks.length - 1];
+  const tot = parseInt(env.document.getElementById("q-total").textContent, 10);
+  const tset = new Set(dk.slice(0, tot).map((q) => q.type));
+  if (!tset.has("Serial Reasoning") || !tset.has("Spatial Visualization"))
+    note(`Level C from home missing types: ${[...tset]}`);
+  else ok(`Home Level C unlocks all four types: ${[...tset].length} present`);
+
   console.log(`\n=== ${findings.length} finding(s) ===`);
   findings.forEach((f) => console.log(" - " + f));
   process.exit(0);

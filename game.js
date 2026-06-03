@@ -508,6 +508,21 @@
     B: "Grade 1 · adds Sequences (Serial Reasoning)",
     C: "Grade 2 · adds Turns & Combine (Spatial)",
   };
+  // changing level resets the puzzle types to everything that level offers;
+  // keeps the start-screen and settings level pickers in sync.
+  function setLevel(L) {
+    if (!levelTypes(L).length) return;
+    settings.level = L;
+    settings.types = levelTypes(L);
+    saveSettings();
+    renderHomeLevel();
+    if (!settingsScreen.classList.contains("hidden")) renderSettings();
+  }
+  function renderHomeLevel() {
+    setActive("home-level", "level", settings.level, false);
+    const note = $("home-level-note");
+    if (note) note.textContent = LEVEL_NOTE[settings.level] || "";
+  }
   function renderSettings() {
     setActive("set-level", "level", settings.level, false);
     $("level-note").textContent = LEVEL_NOTE[settings.level] || "";
@@ -544,9 +559,7 @@
     $("set-level").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
-      settings.level = c.dataset.level;
-      settings.types = levelTypes(settings.level); // enable all types for the level
-      saveSettings();
+      setLevel(c.dataset.level); // enables all types for the level + syncs UIs
       renderSettings();
       sfx("tap");
     });
@@ -826,6 +839,14 @@
   // ---- Wire up --------------------------------------------------------
   updateSoundToggleUI();
   wireChips();
+  renderHomeLevel();
+
+  $("home-level").addEventListener("click", (e) => {
+    const c = e.target.closest(".chip");
+    if (!c) return;
+    setLevel(c.dataset.level);
+    sfx("tap");
+  });
 
   $("start-btn").addEventListener("click", startGame);
   $("open-settings").addEventListener("click", openSettings);
