@@ -2,19 +2,27 @@
 // like a user (clicking buttons/options) to find UX/logic problems.
 const fs = require("fs");
 const path = require("path");
-const { JSDOM } = require("jsdom");
+const { JSDOM, VirtualConsole } = require("jsdom");
 
 const ROOT = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 
 function launch(opts = {}) {
+  // capture any runtime errors (thrown in handlers, console.error, jsdomError)
+  const errors = [];
+  const vc = new VirtualConsole();
+  vc.on("jsdomError", (e) => errors.push("jsdomError: " + (e && e.message ? e.message : e)));
+  vc.on("error", (...a) => errors.push("console.error: " + a.join(" ")));
+
   const dom = new JSDOM(html, {
     runScripts: "outside-only",
     pretendToBeVisual: true,
     url: "https://example.com/",
+    virtualConsole: vc,
   });
   const { window } = dom;
   const { document } = window;
+  window.addEventListener("error", (e) => errors.push("window.error: " + (e.error && e.error.message)));
 
   // --- stubs the game expects ---
   window.localStorage.clear();
@@ -96,7 +104,7 @@ function launch(opts = {}) {
 
   window.eval(gjs);
 
-  return { dom, window, document, spoken, tones, decks, live };
+  return { dom, window, document, spoken, tones, decks, live, errors };
 }
 
 // helpers --------------------------------------------------------------

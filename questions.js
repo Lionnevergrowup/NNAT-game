@@ -586,9 +586,14 @@
     } else if (sub === "colorflow") {
       const order = pickN(COLORS, 3);
       const k = pick(SHAPES);
+      const extra = pick(COLORS.filter((c) => order.indexOf(c) === -1));
       cells = grid3((r, c) => ({ kind: k, color: order[c] }));
       correct = { kind: k, color: order[2] };
-      distractors = [{ kind: k, color: order[0] }, { kind: k, color: order[1] }, { kind: k, color: otherColor(order[0]) === order[1] ? otherColor(order[1]) : otherColor(order[0]) }];
+      distractors = [
+        { kind: k, color: order[0] },
+        { kind: k, color: order[1] },
+        { kind: k, color: extra },
+      ];
     } else if (sub === "rotate") {
       const shp = pick(["arrow", "flag"]);
       const color = pick(COLORS);

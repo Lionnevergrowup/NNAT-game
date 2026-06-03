@@ -1,5 +1,12 @@
 // Play the game like a user and report anything that looks wrong.
-const { launch, visibleScreen, click } = require("./harness");
+const H = require("./harness");
+const { visibleScreen, click } = H;
+const _envs = [];
+function launch(opts) {
+  const e = H.launch(opts);
+  _envs.push(e);
+  return e;
+}
 
 const findings = [];
 function note(msg) {
@@ -309,6 +316,11 @@ async function playGame(env, strategy) {
   if (!tset.has("Serial Reasoning") || !tset.has("Spatial Visualization"))
     note(`Level C from home missing types: ${[...tset]}`);
   else ok(`Home Level C unlocks all four types: ${[...tset].length} present`);
+
+  // no runtime errors should have surfaced in any handler across all sessions
+  const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
+  if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));
+  else ok(`no runtime errors across ${_envs.length} sessions`);
 
   console.log(`\n=== ${findings.length} finding(s) ===`);
   findings.forEach((f) => console.log(" - " + f));

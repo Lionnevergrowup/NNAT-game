@@ -1,5 +1,12 @@
 // Edge-case probes beyond the happy-path playthrough.
-const { launch, visibleScreen, click } = require("./harness");
+const H = require("./harness");
+const { visibleScreen, click } = H;
+const _envs = [];
+function launch(opts) {
+  const e = H.launch(opts);
+  _envs.push(e);
+  return e;
+}
 const findings = [];
 const note = (m) => (findings.push(m), console.log("  ⚠ " + m));
 const ok = (m) => console.log("  ✓ " + m);
@@ -130,6 +137,10 @@ function playAll(env, strategy) {
   else
     note(`No same-subtype follow-up after wrong answer (missed ${missed.g}:${missed.sub}; ` +
       `pos2=${seq[2].g}:${seq[2].sub}, pos4=${seq[4].g}:${seq[4].sub})`);
+
+  const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
+  if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));
+  else ok(`no runtime errors across ${_envs.length} sessions`);
 
   console.log(`\n=== ${findings.length} finding(s) ===`);
   findings.forEach((f) => console.log(" - " + f));

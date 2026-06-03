@@ -511,7 +511,8 @@
   // changing level resets the puzzle types to everything that level offers;
   // keeps the start-screen and settings level pickers in sync.
   function setLevel(L) {
-    if (!levelTypes(L).length) return;
+    if (!levelTypes(L).length || L === settings.level) return; // re-tapping the
+    // current level keeps your chosen puzzle-type subset instead of resetting it
     settings.level = L;
     settings.types = levelTypes(L);
     saveSettings();
