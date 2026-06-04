@@ -354,7 +354,7 @@
     const cols = paletteFor(level);
     const subs = patternSubs(level);
     const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
-    const n = level === "A" ? randInt(2, 3) : level === "B" ? 3 : 4;
+    const n = level === "C" ? 4 : 3;
     let g, distractors;
 
     if (sub === "altShape") {
@@ -602,10 +602,10 @@
       const row = [{ kind: sA, color: cA }, { kind: "plus" }, { kind: sB, color: cB }, null];
       const correct = { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: sB, color: cB, scale: SMS }] };
       const distractors = [
-        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }] },
-        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: BIGS }] },
-        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: sB, color: cA, scale: SMS }] },
-        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: BIGS }, { kind: sA, color: cA, scale: SMS }] },
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }] }, // only A
+        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: BIGS }] }, // only B
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: sB, color: cA, scale: SMS }] }, // B wrong colour
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: otherShape([sA, sB]), color: cB, scale: SMS }] }, // wrong 2nd shape
       ];
       return tagify(
         makeSeries("Put the two shapes together. Which piece do you get?", row, distinctOptions(correct, distractors, cols), "Spatial Visualization"),
