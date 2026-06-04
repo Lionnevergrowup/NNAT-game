@@ -21,7 +21,7 @@ function playAll(env, strategy) {
   return (async () => {
     for (let i = 0; i < total; i++) {
       const ans = qs[i].answer;
-      const idx = strategy === "correct" ? ans : strategy === "wrong" ? (ans + 1) % 4 : i % 4;
+      const idx = strategy === "correct" ? ans : strategy === "wrong" ? (ans + 1) % 5 : i % 5;
       click(env.window, d.getElementById("options").children[idx]);
       await tick(50);
       click(env.window, d.getElementById("next-btn"));
@@ -45,7 +45,7 @@ function playAll(env, strategy) {
   if (sc !== "1") note(`Triple-tap correct gave score=${sc} (expected 1)`);
   else ok("Triple-tap counts once");
   // clicking a different (wrong) option after answering shouldn't change anything
-  const other = env.document.getElementById("options").children[(ans0 + 1) % 4];
+  const other = env.document.getElementById("options").children[(ans0 + 1) % 5];
   click(env.window, other);
   if (env.document.getElementById("score").textContent !== "1") note("Post-answer click changed score");
   else ok("Locked after first answer");
@@ -124,7 +124,7 @@ function playAll(env, strategy) {
   for (let i = 0; i < 6; i++) {
     seq.push({ g: env.live.q.g, sub: env.live.q.sub });
     const ans = env.live.q.answer;
-    const idx = i === 0 ? (ans + 1) % 4 : ans; // miss Q1, then answer correctly
+    const idx = i === 0 ? (ans + 1) % 5 : ans; // miss Q1, then answer correctly
     click(env.window, env.document.getElementById("options").children[idx]);
     await tick(60);
     click(env.window, env.document.getElementById("next-btn"));

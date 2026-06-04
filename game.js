@@ -907,7 +907,7 @@
     else if (questions[index] && !quizScreen.classList.contains("hidden")) speak(questions[index].prompt);
   });
 
-  // keyboard: 1-4 answer, Enter/Space next
+  // keyboard: 1-5 answer, Enter/Space next
   document.addEventListener("keydown", (e) => {
     if (!lockScreen.classList.contains("hidden")) {
       if (/^[0-9]$/.test(e.key)) pinPress(e.key);

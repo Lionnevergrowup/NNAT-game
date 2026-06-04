@@ -361,11 +361,8 @@ body {
 
 .options {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-@media (min-width: 560px) {
-  .options { grid-template-columns: repeat(4, 1fr); }
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 12px;
 }
 
 .option {
@@ -496,7 +493,7 @@ body {
   }
   .stimulus { margin-bottom: 0; max-width: min(320px, 64vh); }
   .answer-area { min-width: 0; }
-  .options { grid-template-columns: repeat(2, 1fr); }
+  .options { grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); }
   .prompt { margin: 2px 0 10px; }
   .feedback { margin-top: 14px; }
   .site-footer { padding: 8px 16px; font-size: 0.72rem; }

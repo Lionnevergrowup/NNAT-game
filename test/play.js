@@ -41,14 +41,14 @@ async function playGame(env, strategy) {
       note(`Q${i + 1}: progress shows ${$("q-current").textContent}`);
     }
     const opts = Array.from($("options").children);
-    if (opts.length !== 4) note(`Q${i + 1}: expected 4 options, got ${opts.length}`);
+    if (opts.length !== 5) note(`Q${i + 1}: expected 5 options, got ${opts.length}`);
 
     // read the LIVE current question (adaptive may have swapped it in)
     const ans = env.live.q.answer;
     let choiceIdx;
     if (strategy === "correct") choiceIdx = ans;
-    else if (strategy === "wrong") choiceIdx = (ans + 1) % 4;
-    else choiceIdx = i % 4; // mixed
+    else if (strategy === "wrong") choiceIdx = (ans + 1) % 5;
+    else choiceIdx = i % 5; // mixed
 
     const correct = choiceIdx === ans;
     if (correct) expectedScore++;

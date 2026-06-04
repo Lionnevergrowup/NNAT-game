@@ -15,18 +15,24 @@
 (function (global) {
   "use strict";
 
-  // Bright, friendly palette
+  // NNAT-authentic palette: the test is culture-fair and uses only black,
+  // white, yellow and blue, with green as a rare 5th colour at higher levels.
+  // White is the background, so the usable *fill* colours are yellow, blue,
+  // black and green.
   const C = {
-    red: "#ff5a5f",
-    blue: "#3d8bfd",
-    yellow: "#ffd23f",
-    green: "#2ec27e",
-    purple: "#9b5de5",
-    orange: "#ff924c",
-    pink: "#ff6fb5",
-    teal: "#1fc8db",
+    yellow: "#f4c20d",
+    blue: "#2f6fe0",
+    black: "#23252f",
+    green: "#2ea84f",
     white: "#ffffff",
   };
+
+  // Fill colours available at each level (A=K, B=Gr1, C=Gr2).
+  function paletteFor(level) {
+    if (level === "B") return [C.yellow, C.blue, C.black];
+    if (level === "C") return [C.yellow, C.blue, C.black, C.green];
+    return [C.yellow, C.blue]; // Level A: primarily yellow & blue
+  }
 
   // ---- low level shape drawing (returns SVG markup for a single cell) ----
   function shape(kind, color, size) {
@@ -65,29 +71,18 @@
   }
 
   // Draw a shape centered inside a cell of `cellSize`, scaled and rotated.
+  // A thin dark outline (like the real NNAT) keeps yellow shapes legible on
+  // white; SVG stroke is inherited by the inner shape primitives.
   function shapeScaled(kind, color, cellSize, scale, rot) {
     const s = cellSize * (scale || 1);
     const off = (cellSize - s) / 2;
     const rotate = rot ? `rotate(${rot} ${cellSize / 2} ${cellSize / 2}) ` : "";
-    return `<g transform="${rotate}translate(${off},${off})">${shape(kind, color, s)}</g>`;
-  }
-
-  // Draw `count` small dots in a row, centered. The radius adapts to the
-  // count so the dots always fit inside the cell (even at 4).
-  function dots(count, color, cellSize) {
-    const usable = cellSize * 0.84;
-    const gapRatio = 0.6;
-    let r = usable / (count * 2 + (count - 1) * gapRatio);
-    r = Math.min(r, cellSize * 0.16);
-    const gap = r * gapRatio;
-    const totalW = count * (2 * r) + (count - 1) * gap;
-    const startX = (cellSize - totalW) / 2 + r;
-    let s = "";
-    for (let i = 0; i < count; i++) {
-      const cx = startX + i * (2 * r + gap);
-      s += `<circle cx="${cx}" cy="${cellSize / 2}" r="${r}" fill="${color}"/>`;
-    }
-    return s;
+    const sw = Math.max(1, cellSize * 0.022);
+    return `<g transform="${rotate}translate(${off},${off})" stroke="#1f2233" stroke-width="${sw}" stroke-linejoin="round">${shape(
+      kind,
+      color,
+      s
+    )}</g>`;
   }
 
   // A grey plus sign (used in "combine these shapes" spatial items).
@@ -99,10 +94,8 @@
   }
 
   // Render any cell spec:
-  //  {kind:'dots',count,color} · {kind:'plus'} · {kind:'combo',shapes:[...]} ·
-  //  {kind,color,scale,rot}
+  //  {kind:'plus'} · {kind:'combo',shapes:[...]} · {kind,color,scale,rot}
   function renderSpec(spec, cellSize) {
-    if (spec.kind === "dots") return dots(spec.count, spec.color, cellSize);
     if (spec.kind === "plus") return plusSign(cellSize);
     if (spec.kind === "combo")
       return spec.shapes
@@ -154,73 +147,8 @@
     return `<rect x="0" y="0" width="${size}" height="${size}" rx="${size * 0.08}" fill="${bg}" stroke="${stroke}" stroke-width="2"/>${content}${missing}`;
   }
 
-  // ---- pattern-completion (the classic NNAT Level A item) ----------------
-  // Build a big square split into a grid that follows a simple visual rule.
-  // One cell is cut out (shown white with a ?). The options are candidate
-  // tiles and exactly one continues the pattern.
-
-  function patternSVG(grid, n, hole) {
-    const S = 300;
-    const g = S / n;
-    let body = `<rect x="0" y="0" width="${S}" height="${S}" rx="14" fill="#ffffff" stroke="#c7cbe0" stroke-width="3"/>`;
-    for (let y = 0; y < n; y++) {
-      for (let x = 0; x < n; x++) {
-        const isHole = hole && hole.x === x && hole.y === y;
-        const fill = isHole ? "#ffffff" : grid[y][x];
-        body += `<rect x="${x * g}" y="${y * g}" width="${g}" height="${g}" fill="${fill}" stroke="#eef0f8" stroke-width="1"/>`;
-        if (isHole) {
-          body += `<rect x="${x * g + 3}" y="${y * g + 3}" width="${g - 6}" height="${g - 6}" rx="6" fill="#f4f5fb" stroke="#b9bed1" stroke-width="2" stroke-dasharray="6 5"/>`;
-          body += `<text x="${x * g + g / 2}" y="${y * g + g / 2 + g * 0.16}" font-size="${g * 0.5}" text-anchor="middle" fill="#b9bed1">?</text>`;
-        }
-      }
-    }
-    return svgWrap(body, S);
-  }
-
-  function colorTileSVG(color) {
-    const S = 90;
-    return svgWrap(
-      `<rect x="0" y="0" width="${S}" height="${S}" rx="12" fill="${color}" stroke="#d6d9e6" stroke-width="2"/>`,
-      S
-    );
-  }
-
   function svgWrap(body, size) {
     return `<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">${body}</svg>`;
-  }
-
-  // ---- pattern generators (each returns a full grid of colors) -----------
-  function checker(n, a, b) {
-    const g = [];
-    for (let y = 0; y < n; y++) {
-      g.push([]);
-      for (let x = 0; x < n; x++) g[y].push((x + y) % 2 === 0 ? a : b);
-    }
-    return g;
-  }
-  function vStripes(n, colors) {
-    const g = [];
-    for (let y = 0; y < n; y++) {
-      g.push([]);
-      for (let x = 0; x < n; x++) g[y].push(colors[x % colors.length]);
-    }
-    return g;
-  }
-  function hStripes(n, colors) {
-    const g = [];
-    for (let y = 0; y < n; y++) {
-      g.push([]);
-      for (let x = 0; x < n; x++) g[y].push(colors[y % colors.length]);
-    }
-    return g;
-  }
-  function diagStripes(n, colors) {
-    const g = [];
-    for (let y = 0; y < n; y++) {
-      g.push([]);
-      for (let x = 0; x < n; x++) g[y].push(colors[(x + y) % colors.length]);
-    }
-    return g;
   }
 
   // shuffle helper (Fisher–Yates) used to mix answer order
@@ -231,30 +159,6 @@
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
-  }
-
-  // Build a color-pattern question: cut a hole, correct = grid color there,
-  // distractors = other colors used.
-  function makeColorPattern(prompt, grid, n, hole, distractorColors) {
-    const correctColor = grid[hole.y][hole.x];
-    const opts = [{ color: correctColor, correct: true }];
-    distractorColors
-      .filter((c) => c !== correctColor)
-      .slice(0, 3)
-      .forEach((c) => opts.push({ color: c, correct: false }));
-    const mixed = shuffle(opts);
-    const S = 300;
-    const g = S / n;
-    return {
-      type: "Pattern Completion",
-      prompt,
-      stimulus: patternSVG(grid, n, hole),
-      solved: patternSVG(grid, n, null),
-      hole: { x: hole.x * g, y: hole.y * g, w: g, h: g },
-      vb: { w: S, h: S },
-      options: mixed.map((o) => colorTileSVG(o.color)),
-      answer: mixed.findIndex((o) => o.correct),
-    };
   }
 
   // Build a "matrix reasoning" question from an explicit grid of cell specs.
@@ -348,7 +252,7 @@
   // Procedural question generators — each guarantees a unique correct
   // answer. buildQuestions() assembles a fresh, shuffled set of 48.
   // =====================================================================
-  const COLORS = [C.red, C.blue, C.yellow, C.green, C.purple, C.orange, C.pink, C.teal];
+  const ALLFILL = [C.yellow, C.blue, C.black, C.green];
   const SHAPES = ["circle", "square", "triangle", "diamond", "star", "heart"];
   const SM = 0.58; // small scale for size questions
   const BG = 1.0; // big scale
@@ -365,9 +269,12 @@
     return pool.slice(0, n);
   }
 
-  // Turn [correct, ...distractors] into 4 distinct, shuffled option specs
-  // (the correct one is always first before shuffleSpecs tags it).
-  function distinctOptions(correct, distractors) {
+  // Turn [correct, ...distractors] into 5 distinct, shuffled option specs
+  // (NNAT uses five answer choices). `palette` constrains any padding colours
+  // to the current level's colours. The correct one is first before shuffle.
+  const N_OPTIONS = 5;
+  function distinctOptions(correct, distractors, palette) {
+    const cols = palette && palette.length ? palette : ALLFILL;
     const seen = new Set([JSON.stringify(correct)]);
     const out = [correct];
     for (const d of distractors) {
@@ -376,18 +283,20 @@
         seen.add(k);
         out.push(d);
       }
-      if (out.length === 4) break;
+      if (out.length === N_OPTIONS) break;
     }
     let guard = 0;
-    while (out.length < 4 && guard++ < 80) {
+    while (out.length < N_OPTIONS && guard++ < 200) {
       let base = Object.assign({}, correct);
-      if (base.kind === "dots") base.count = randInt(1, 4);
-      else if (base.kind === "combo") {
+      if (base.kind === "combo") {
         base = JSON.parse(JSON.stringify(correct));
-        if (base.shapes[0]) base.shapes[0].color = pick(COLORS);
+        if (base.shapes[0]) base.shapes[0].color = pick(cols);
+        if (base.shapes[1] && Math.random() < 0.5) base.shapes.pop();
       } else {
-        base.color = pick(COLORS);
+        base.color = pick(cols);
         if (Math.random() < 0.5) base.kind = pick(SHAPES);
+        if (base.rot !== undefined && Math.random() < 0.5) base.rot = pick([0, 90, 180, 270]);
+        if (base.scale !== undefined && Math.random() < 0.5) base.scale = Math.random() < 0.5 ? SM : BG;
       }
       const k = JSON.stringify(base);
       if (!seen.has(k)) {
@@ -411,70 +320,99 @@
     q.sub = sub;
     return q;
   }
-  function nForLevel(level) {
-    return level === "A" ? randInt(2, 3) : level === "B" ? randInt(3, 4) : randInt(4, 5);
-  }
-  function otherColor(c) {
-    return pick(COLORS.filter((x) => x !== c));
+  const MID = 0.78; // medium scale (for 3-step size sequences)
+  function otherColor(c, cols) {
+    const p = cols && cols.length ? cols : ALLFILL;
+    return pick(p.filter((x) => x !== c)) || c;
   }
   function otherShape(exclude) {
     return pick(SHAPES.filter((s) => exclude.indexOf(s) === -1));
   }
+  function buildGrid(n, fn) {
+    const cells = [];
+    for (let y = 0; y < n; y++) {
+      cells.push([]);
+      for (let x = 0; x < n; x++) cells[y].push(fn(x, y));
+    }
+    const hole = { x: randInt(0, n - 1), y: randInt(0, n - 1) };
+    const correctSpec = cells[hole.y][hole.x];
+    cells[hole.y][hole.x] = null;
+    return { cells, hole, correctSpec };
+  }
 
   // =====================================================================
   // Pattern Completion  (NNAT levels A–E)
+  // A "design" made of shapes/colours with one square removed; the answer
+  // continues the design. Options are shape tiles in the level's palette.
   // =====================================================================
   function patternSubs(level) {
-    const base = ["checker", "vstripe", "hstripe"];
-    if (level === "A") return base;
-    if (level === "B") return base.concat("diag");
-    return base.concat("diag", "shapegrid");
+    if (level === "A") return ["altShape", "altColor"];
+    if (level === "B") return ["altShape", "altColor", "diagColor"];
+    return ["altShape", "altColor", "diagColor", "altBoth"];
   }
   function genPattern(level, forceSub) {
+    const cols = paletteFor(level);
     const subs = patternSubs(level);
     const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
+    const n = level === "A" ? randInt(2, 3) : level === "B" ? 3 : 4;
+    let g, distractors;
 
-    if (sub === "shapegrid") {
-      const n = Math.min(nForLevel(level), 4);
+    if (sub === "altShape") {
       const [sA, sB] = pickN(SHAPES, 2);
-      const color = pick(COLORS);
-      const cells = [];
-      for (let y = 0; y < n; y++) {
-        cells.push([]);
-        for (let x = 0; x < n; x++) cells[y].push({ kind: (x + y) % 2 === 0 ? sA : sB, color });
-      }
-      const hole = { x: randInt(0, n - 1), y: randInt(0, n - 1) };
-      const correctSpec = cells[hole.y][hole.x];
-      cells[hole.y][hole.x] = null;
-      const distractors = [
-        { kind: correctSpec.kind === sA ? sB : sA, color },
-        { kind: correctSpec.kind, color: otherColor(color) },
+      const color = pick(cols);
+      g = buildGrid(n, (x, y) => ({ kind: (x + y) % 2 === 0 ? sA : sB, color }));
+      const cs = g.correctSpec;
+      const oc = otherColor(color, cols);
+      distractors = [
+        { kind: cs.kind === sA ? sB : sA, color },
+        { kind: cs.kind, color: oc },
         { kind: otherShape([sA, sB]), color },
+        { kind: cs.kind === sA ? sB : sA, color: oc },
       ];
-      return tagify(
-        makeMatrix("Find the missing piece of the pattern.", cells, hole, distinctOptions(correctSpec, distractors), "Pattern Completion"),
-        "pattern",
-        sub
-      );
+    } else if (sub === "altColor") {
+      const [cA, cB] = pickN(cols, 2);
+      const kind = pick(SHAPES);
+      g = buildGrid(n, (x, y) => ({ kind, color: (x + y) % 2 === 0 ? cA : cB }));
+      const cs = g.correctSpec;
+      const os = otherShape([kind]);
+      distractors = [
+        { kind, color: cs.color === cA ? cB : cA },
+        { kind: os, color: cs.color },
+        { kind: os, color: cs.color === cA ? cB : cA },
+        { kind: otherShape([kind, os]), color: cs.color },
+      ];
+    } else if (sub === "diagColor") {
+      const m = Math.min(cols.length, 3);
+      const order = pickN(cols, m);
+      const kind = pick(SHAPES);
+      g = buildGrid(n, (x, y) => ({ kind, color: order[(x + y) % m] }));
+      const cs = g.correctSpec;
+      const os = otherShape([kind]);
+      distractors = order
+        .filter((c) => c !== cs.color)
+        .map((c) => ({ kind, color: c }))
+        .concat([
+          { kind: os, color: cs.color },
+          { kind: os, color: order[0] !== cs.color ? order[0] : order[1] },
+        ]);
+    } else {
+      // altBoth: shape alternates with x+y, colour alternates by row (two rules)
+      const [sA, sB] = pickN(SHAPES, 2);
+      const [cA, cB] = pickN(cols, 2);
+      g = buildGrid(n, (x, y) => ({ kind: (x + y) % 2 === 0 ? sA : sB, color: y % 2 === 0 ? cA : cB }));
+      const cs = g.correctSpec;
+      distractors = [
+        { kind: cs.kind === sA ? sB : sA, color: cs.color },
+        { kind: cs.kind, color: cs.color === cA ? cB : cA },
+        { kind: cs.kind === sA ? sB : sA, color: cs.color === cA ? cB : cA },
+        { kind: otherShape([sA, sB]), color: cs.color },
+      ];
     }
-
-    const n = nForLevel(level);
-    let grid;
-    if (sub === "checker") {
-      const [a, b] = pickN(COLORS, 2);
-      grid = checker(n, a, b);
-    } else if (sub === "vstripe") grid = vStripes(n, pickN(COLORS, 2));
-    else if (sub === "hstripe") grid = hStripes(n, pickN(COLORS, 2));
-    else grid = diagStripes(n, pickN(COLORS, level === "C" ? randInt(3, 4) : 3));
-    const hole = { x: randInt(0, n - 1), y: randInt(0, n - 1) };
-    const correct = grid[hole.y][hole.x];
-    const distractors = pickN(COLORS, 3, [correct]);
-    const prompt = pick([
-      "One piece is missing. Which color belongs in the empty box?",
-      "Find the missing tile.",
-      "Which color completes the pattern?",
-    ]);
-    return tagify(makeColorPattern(prompt, grid, n, hole, distractors), "pattern", sub);
+    return tagify(
+      makeMatrix("Find the missing piece of the pattern.", g.cells, g.hole, distinctOptions(g.correctSpec, distractors, cols), "Pattern Completion"),
+      "pattern",
+      sub
+    );
   }
 
   // =====================================================================
@@ -487,22 +425,28 @@
     return base.concat("rotate", "multi");
   }
   function genAnalogy(level, forceSub) {
+    const cols = paletteFor(level);
     const subs = analogySubs(level);
     const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
     let cells, correct, distractors, prompt;
 
     if (sub === "color") {
-      const [c0, c1, c2] = pickN(COLORS, 3);
+      const [c0, c1] = pickN(cols, 2);
       const [k0, k1] = pickN(SHAPES, 2);
       cells = [[{ kind: k0, color: c0 }, { kind: k0, color: c1 }], [{ kind: k1, color: c0 }, null]];
       correct = { kind: k1, color: c1 };
-      distractors = [{ kind: k1, color: c0 }, { kind: k0, color: c1 }, { kind: k1, color: c2 }];
+      distractors = [
+        { kind: k1, color: c0 },
+        { kind: k0, color: c1 },
+        { kind: k0, color: c0 },
+        { kind: otherShape([k0, k1]), color: c1 },
+      ];
       prompt = "The shapes change color. Which piece is missing?";
     } else if (sub === "size") {
       const big = Math.random() < 0.5;
       const sA = big ? SM : BG;
       const sB = big ? BG : SM;
-      const [c0, c1] = pickN(COLORS, 2);
+      const [c0, c1] = pickN(cols, 2);
       const [k0, k1] = pickN(SHAPES, 2);
       cells = [
         [{ kind: k0, color: c0, scale: sA }, { kind: k0, color: c0, scale: sB }],
@@ -512,20 +456,27 @@
       distractors = [
         { kind: k1, color: c1, scale: sA },
         { kind: k0, color: c1, scale: sB },
-        { kind: k1, color: otherColor(c1), scale: sB },
+        { kind: k1, color: c0, scale: sB },
+        { kind: k0, color: c1, scale: sA },
       ];
       prompt = big ? "The shapes get bigger. Which piece is missing?" : "The shapes get smaller. Which piece is missing?";
     } else if (sub === "shape") {
       const [s0, s1, s2] = pickN(SHAPES, 3);
-      const [c0, c1] = pickN(COLORS, 2);
+      const [c0, c1] = pickN(cols, 2);
       cells = [[{ kind: s0, color: c0 }, { kind: s1, color: c0 }], [{ kind: s0, color: c1 }, null]];
       correct = { kind: s1, color: c1 };
-      distractors = [{ kind: s0, color: c1 }, { kind: s1, color: c0 }, { kind: s2, color: c1 }];
+      distractors = [
+        { kind: s0, color: c1 },
+        { kind: s1, color: c0 },
+        { kind: s2, color: c1 },
+        { kind: s0, color: c0 },
+      ];
       prompt = "Each column is the same shape. What completes the picture?";
     } else if (sub === "rotate") {
       const [k0, k1] = pickN(["arrow", "flag"], 2);
-      const [c0, c1] = pickN(COLORS, 2);
+      const [c0, c1] = pickN(cols, 2);
       const ang = pick([90, 180, 270]);
+      const other = pick([90, 180, 270].filter((a) => a !== ang));
       cells = [
         [{ kind: k0, color: c0, rot: 0 }, { kind: k0, color: c0, rot: ang }],
         [{ kind: k1, color: c1, rot: 0 }, null],
@@ -533,14 +484,15 @@
       correct = { kind: k1, color: c1, rot: ang };
       distractors = [
         { kind: k1, color: c1, rot: 0 },
-        { kind: k1, color: c1, rot: pick([90, 180, 270].filter((a) => a !== ang)) },
+        { kind: k1, color: c1, rot: other },
         { kind: k0, color: c1, rot: ang },
+        { kind: k1, color: c0, rot: ang },
       ];
       prompt = "The shape is turned. Which piece is missing?";
     } else {
-      // multi: shape AND size change across columns; color differs by row
+      // multi: shape AND size change across columns; colour differs by row
       const [s0, s1] = pickN(SHAPES, 2);
-      const [c0, c1] = pickN(COLORS, 2);
+      const [c0, c1] = pickN(cols, 2);
       cells = [
         [{ kind: s0, color: c0, scale: SM }, { kind: s1, color: c0, scale: BG }],
         [{ kind: s0, color: c1, scale: SM }, null],
@@ -550,18 +502,20 @@
         { kind: s1, color: c1, scale: SM },
         { kind: s0, color: c1, scale: BG },
         { kind: s1, color: c0, scale: BG },
+        { kind: s0, color: c0, scale: SM },
       ];
       prompt = "Two things change. Which piece is missing?";
     }
-    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors)), "analogy", sub);
+    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors, cols)), "analogy", sub);
   }
 
   // =====================================================================
-  // Serial Reasoning  (NNAT levels B–G)  — 3×3 grid, missing bottom-right
+  // Serial Reasoning  (NNAT levels B–G)  — 3×3 grid, shapes change across
+  // rows AND down columns; the missing piece is bottom-right.
   // =====================================================================
   function serialSubs(level) {
-    const base = ["shapeflow", "colorflow", "rotate"];
-    return level === "C" ? base.concat("matrix2") : base;
+    const base = ["matrix", "matrixT", "rotate"];
+    return level === "C" ? base.concat("sizeMatrix") : base;
   }
   function grid3(fn) {
     const cells = [];
@@ -572,51 +526,61 @@
     return cells;
   }
   function genSerial(level, forceSub) {
+    const cols = paletteFor(level); // serial is B+, so cols has >= 3 colours
     const subs = serialSubs(level);
     const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
     let cells, correct, distractors;
     const prompt = "Which piece completes the grid?";
 
-    if (sub === "shapeflow") {
-      const order = pickN(SHAPES, 3);
-      const color = pick(COLORS);
-      cells = grid3((r, c) => ({ kind: order[c], color }));
-      correct = { kind: order[2], color };
-      distractors = [{ kind: order[0], color }, { kind: order[1], color }, { kind: otherShape(order), color }];
-    } else if (sub === "colorflow") {
-      const order = pickN(COLORS, 3);
-      const k = pick(SHAPES);
-      const extra = pick(COLORS.filter((c) => order.indexOf(c) === -1));
-      cells = grid3((r, c) => ({ kind: k, color: order[c] }));
-      correct = { kind: k, color: order[2] };
-      distractors = [
-        { kind: k, color: order[0] },
-        { kind: k, color: order[1] },
-        { kind: k, color: extra },
-      ];
-    } else if (sub === "rotate") {
-      const shp = pick(["arrow", "flag"]);
-      const color = pick(COLORS);
-      const step = pick([90, 270]);
-      cells = grid3((r, c) => ({ kind: shp, color, rot: ((r * 3 + c) * step) % 360 }));
-      correct = { kind: shp, color, rot: (8 * step) % 360 };
-      distractors = [90, 180, 270]
-        .map((a) => ({ kind: shp, color, rot: a }))
-        .filter((d) => d.rot !== correct.rot)
-        .slice(0, 3);
-    } else {
-      // matrix2: shape by column AND color by row (two variables)
+    if (sub === "matrix") {
+      // shape by column, colour by row
       const sOrder = pickN(SHAPES, 3);
-      const cOrder = pickN(COLORS, 3);
+      const cOrder = pickN(cols, 3);
       cells = grid3((r, c) => ({ kind: sOrder[c], color: cOrder[r] }));
       correct = { kind: sOrder[2], color: cOrder[2] };
       distractors = [
         { kind: sOrder[2], color: cOrder[1] },
         { kind: sOrder[1], color: cOrder[2] },
         { kind: sOrder[0], color: cOrder[0] },
+        { kind: sOrder[1], color: cOrder[1] },
+      ];
+    } else if (sub === "matrixT") {
+      // colour by column, shape by row
+      const sOrder = pickN(SHAPES, 3);
+      const cOrder = pickN(cols, 3);
+      cells = grid3((r, c) => ({ kind: sOrder[r], color: cOrder[c] }));
+      correct = { kind: sOrder[2], color: cOrder[2] };
+      distractors = [
+        { kind: sOrder[1], color: cOrder[2] },
+        { kind: sOrder[2], color: cOrder[1] },
+        { kind: sOrder[0], color: cOrder[0] },
+        { kind: sOrder[1], color: cOrder[1] },
+      ];
+    } else if (sub === "rotate") {
+      const shp = pick(["arrow", "flag"]);
+      const color = pick(cols);
+      const step = pick([90, 270]);
+      cells = grid3((r, c) => ({ kind: shp, color, rot: ((r * 3 + c) * step) % 360 }));
+      correct = { kind: shp, color, rot: (8 * step) % 360 };
+      distractors = [90, 180, 270]
+        .filter((a) => a !== correct.rot)
+        .map((a) => ({ kind: shp, color, rot: a }))
+        .concat([{ kind: shp === "arrow" ? "flag" : "arrow", color, rot: correct.rot }]);
+    } else {
+      // sizeMatrix (C): shape by column, size grows down the rows
+      const sOrder = pickN(SHAPES, 3);
+      const sizes = [SM, MID, BG];
+      const color = pick(cols);
+      cells = grid3((r, c) => ({ kind: sOrder[c], color, scale: sizes[r] }));
+      correct = { kind: sOrder[2], color, scale: BG };
+      distractors = [
+        { kind: sOrder[2], color, scale: MID },
+        { kind: sOrder[1], color, scale: BG },
+        { kind: sOrder[0], color, scale: SM },
+        { kind: sOrder[1], color, scale: MID },
       ];
     }
-    return tagify(makeMatrix(prompt, cells, { x: 2, y: 2 }, distinctOptions(correct, distractors), "Serial Reasoning"), "serial", sub);
+    return tagify(makeMatrix(prompt, cells, { x: 2, y: 2 }, distinctOptions(correct, distractors, cols), "Serial Reasoning"), "serial", sub);
   }
 
   // =====================================================================
@@ -626,28 +590,25 @@
     return ["rotate", "combine"];
   }
   function genSpatial(level, forceSub) {
+    const cols = paletteFor(level);
     const subs = spatialSubs();
     const sub = forceSub && subs.indexOf(forceSub) !== -1 ? forceSub : pick(subs);
 
     if (sub === "combine") {
       const [sA, sB] = pickN(SHAPES, 2);
-      const [cA, cB] = pickN(COLORS, 2);
-      const big = { scale: 0.95 };
-      const small = { scale: 0.5 };
-      const row = [
-        { kind: sA, color: cA },
-        { kind: "plus" },
-        { kind: sB, color: cB },
-        null,
-      ];
-      const correct = { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }, { kind: sB, color: cB, scale: small.scale }] };
+      const [cA, cB] = pickN(cols, 2);
+      const BIGS = 0.95;
+      const SMS = 0.5;
+      const row = [{ kind: sA, color: cA }, { kind: "plus" }, { kind: sB, color: cB }, null];
+      const correct = { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: sB, color: cB, scale: SMS }] };
       const distractors = [
-        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }] },
-        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: big.scale }] },
-        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: big.scale }, { kind: sB, color: cA, scale: small.scale }] },
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }] },
+        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: BIGS }] },
+        { kind: "combo", shapes: [{ kind: sA, color: cA, scale: BIGS }, { kind: sB, color: cA, scale: SMS }] },
+        { kind: "combo", shapes: [{ kind: sB, color: cB, scale: BIGS }, { kind: sA, color: cA, scale: SMS }] },
       ];
       return tagify(
-        makeSeries("Put the two shapes together. Which piece do you get?", row, distinctOptions(correct, distractors), "Spatial Visualization"),
+        makeSeries("Put the two shapes together. Which piece do you get?", row, distinctOptions(correct, distractors, cols), "Spatial Visualization"),
         "spatial",
         sub
       );
@@ -655,8 +616,9 @@
 
     // rotate: turn the bottom shape the same way as the top pair
     const angle = pick([90, 180, 270]);
+    const other = pick([90, 180, 270].filter((a) => a !== angle));
     const [base, target] = shuffle(["arrow", "flag"]);
-    const [c0, c1] = pickN(COLORS, 2);
+    const [c0, c1] = pickN(cols, 2);
     const cells = [
       [{ kind: base, color: c0, rot: 0 }, { kind: base, color: c0, rot: angle }],
       [{ kind: target, color: c1, rot: 0 }, null],
@@ -664,14 +626,15 @@
     const correct = { kind: target, color: c1, rot: angle };
     const distractors = [
       { kind: target, color: c1, rot: 0 },
-      { kind: target, color: c1, rot: pick([90, 180, 270].filter((a) => a !== angle)) },
+      { kind: target, color: c1, rot: other },
       { kind: base, color: c1, rot: angle },
+      { kind: base, color: c1, rot: 0 },
     ];
     const prompt =
       angle === 180
         ? "The top shape is flipped over. Do the same to the bottom shape."
         : "The top shape is turned. Turn the bottom shape the same way.";
-    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors), "Spatial Visualization"), "spatial", "rotate");
+    return tagify(makeMatrix(prompt, cells, { x: 1, y: 1 }, distinctOptions(correct, distractors, cols), "Spatial Visualization"), "spatial", "rotate");
   }
 
   // ---- registry & level structure (mirrors the official NNAT3) ----------

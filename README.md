@@ -20,10 +20,15 @@ types that appear at that grade (choose it in Settings):
 
 | Type | What the child does |
 | --- | --- |
-| **Pattern Completion** | A picture has a missing square — pick the tile that completes it (checkerboards, stripes, diagonals; shape grids at higher levels). |
+| **Pattern Completion** | A design made of shapes/colors has one square removed — pick the tile that continues the design. |
 | **Reasoning by Analogy** | Shapes change consistently across a 2×2 grid (color, size, shape, rotation, or two things at once) — pick the piece that follows the rule. |
-| **Serial Reasoning** | A 3×3 grid progresses across rows/columns (shape flow, color flow, rotation, or both) — pick the missing bottom-right piece. |
+| **Serial Reasoning** | A 3×3 grid that changes across rows **and** down columns (shape × color, rotation, or size) — pick the missing bottom-right piece. |
 | **Spatial Visualization** | Turn a shape the same way as an example, or **combine** two shapes and pick the result. |
+
+**Matched to the real test:** every question has **5 answer choices**, and the
+art uses only the NNAT's culture‑fair palette — **yellow, blue, black (and green
+at Level C)** with outlined shapes on white — never a rainbow. (Sources:
+TestPrep‑Online, GiftedReady, VisuPrep, TestingMom.)
 
 Questions are generated procedurally, so the bank is effectively unlimited and
 no puzzle repeats within a round.
