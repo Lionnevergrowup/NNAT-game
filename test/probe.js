@@ -138,6 +138,31 @@ function playAll(env, strategy) {
     note(`No same-subtype follow-up after wrong answer (missed ${missed.g}:${missed.sub}; ` +
       `pos2=${seq[2].g}:${seq[2].sub}, pos4=${seq[4].g}:${seq[4].sub})`);
 
+  // Probe 7: recent games show a timestamp, and old (no-ts) records still work
+  console.log("\n[Probe 7] Recent-game timestamps + backward compatibility");
+  // (a) a freshly played game shows a time
+  env = launch();
+  await playAll(env, "mixed");
+  click(env.window, env.document.getElementById("open-progress-2"));
+  const recentList = env.document.getElementById("recent-list");
+  const hasTime = recentList.querySelectorAll(".recent-time").length >= 1;
+  if (!hasTime) note("Freshly played game has no .recent-time shown");
+  else ok("New game shows a timestamp: " + recentList.querySelector(".recent-time").textContent);
+
+  // (b) an old stats record saved WITHOUT a ts must render without crashing
+  const legacy = {
+    games: 1, answered: 10, correct: 6, stars: 4, bestStreak: 2, totalMs: 12000,
+    byType: { "Pattern Completion": { a: 10, c: 6, ms: 12000 } },
+    recent: [{ score: 6, total: 10, stars: 4 }], // no ts (legacy)
+  };
+  env = launch({ localStorage: { "nnat-stats": JSON.stringify(legacy) } });
+  click(env.window, env.document.getElementById("open-progress"));
+  const rl = env.document.getElementById("recent-list");
+  if (!rl.textContent.includes("6 / 10")) note("Legacy recent record not rendered");
+  else if (rl.querySelectorAll(".recent-time").length !== 0) note("Legacy record (no ts) showed a time");
+  else if (!rl.textContent.includes("Earlier")) note("Legacy record not grouped under 'Earlier'");
+  else ok("Legacy record (no ts) renders safely under 'Earlier' with no time");
+
   const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));
   else ok(`no runtime errors across ${_envs.length} sessions`);

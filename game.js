@@ -732,6 +732,16 @@
     if (sameDay(d, yest)) return "Yesterday";
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
+  // time-of-day for a recent game; "" for older records saved before we
+  // started storing a timestamp (backward compatible).
+  function timeLabel(ts) {
+    if (!ts) return "";
+    try {
+      return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } catch (e) {
+      return "";
+    }
+  }
 
   function trendSVG() {
     const games = stats.recent.slice(-10);
@@ -821,9 +831,10 @@
           html += `<div class="recent-date">${lab}</div>`;
           lastLabel = lab;
         }
-        html += `<div class="recent-row"><span>${r.score} / ${r.total}</span><span class="recent-stars">${
-          "⭐".repeat(r.stars || 0) || "–"
-        }</span></div>`;
+        const time = timeLabel(r.ts);
+        html += `<div class="recent-row"><span>${r.score} / ${r.total}</span>${
+          time ? `<span class="recent-time">${time}</span>` : ""
+        }<span class="recent-stars">${"⭐".repeat(r.stars || 0) || "–"}</span></div>`;
       });
       $("recent-list").innerHTML = html;
     }
