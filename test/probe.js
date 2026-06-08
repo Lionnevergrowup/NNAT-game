@@ -63,13 +63,13 @@ function playAll(env, strategy) {
   const voiceOn = env.document.querySelector('#set-voice [data-voice="on"]').classList.contains("active");
   const speedNormal = env.document.querySelector('#set-speed [data-speed="normal"]').classList.contains("active");
   if (!activeLevel || activeLevel.dataset.level !== "A") note("Default level chip not active=A");
-  if (!activeCount || activeCount.dataset.count !== "10") note("Default count chip not active=10");
+  if (!activeCount || activeCount.dataset.count !== "24") note("Default count chip not active=24");
   if (activeTypes !== 2) note(`Default active types=${activeTypes} (expected 2 at Level A)`);
   if (hiddenTypes !== 2) note(`Expected 2 hidden type chips at Level A, got ${hiddenTypes}`);
   if (!voiceOn) note("Voice not shown On by default");
   if (!speedNormal) note("Speed not shown Normal by default");
   if (activeLevel && activeCount && activeTypes === 2 && hiddenTypes === 2 && voiceOn && speedNormal)
-    ok("Defaults render correctly (Level A, 10, 2 visible types, voice On, Normal)");
+    ok("Defaults render correctly (Level A, 24, 2 visible types, voice On, Normal)");
 
   // Probe 3: only-one-type game leaves other types at "—" in progress
   console.log("\n[Probe 3] Untouched type shows —");
@@ -140,14 +140,14 @@ function playAll(env, strategy) {
 
   // Probe 7: recent games show a timestamp, and old (no-ts) records still work
   console.log("\n[Probe 7] Recent-game timestamps + backward compatibility");
-  // (a) a freshly played game shows a time
+  // (a) a freshly played game shows a date header and NO time
   env = launch();
   await playAll(env, "mixed");
   click(env.window, env.document.getElementById("open-progress-2"));
   const recentList = env.document.getElementById("recent-list");
-  const hasTime = recentList.querySelectorAll(".recent-time").length >= 1;
-  if (!hasTime) note("Freshly played game has no .recent-time shown");
-  else ok("New game shows a timestamp: " + recentList.querySelector(".recent-time").textContent);
+  if (recentList.querySelectorAll(".recent-time").length !== 0) note("Time shown though only date wanted");
+  else if (!recentList.querySelector(".recent-date")) note("No date header shown for recent games");
+  else ok("Recent games show date only (no time): " + recentList.querySelector(".recent-date").textContent);
 
   // (b) an old stats record saved WITHOUT a ts must render without crashing
   const legacy = {

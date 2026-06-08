@@ -79,7 +79,7 @@ async function playGame(env, strategy) {
 
 (async function main() {
   // ---- Playthrough 1: a kid who answers everything correctly (count 10) ----
-  console.log("\n[Playthrough 1] All-correct, 10 questions");
+  console.log("\n[Playthrough 1] All-correct, default count");
   let env = launch();
   let r = await playGame(env, "correct");
   if (r) {
@@ -91,7 +91,7 @@ async function playGame(env, strategy) {
   }
 
   // ---- Playthrough 2: all wrong ----
-  console.log("\n[Playthrough 2] All-wrong, 10 questions");
+  console.log("\n[Playthrough 2] All-wrong, default count");
   env = launch();
   r = await playGame(env, "wrong");
   if (r) {
