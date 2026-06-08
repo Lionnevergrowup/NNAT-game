@@ -163,6 +163,26 @@ function playAll(env, strategy) {
   else if (!rl.textContent.includes("Earlier")) note("Legacy record not grouped under 'Earlier'");
   else ok("Legacy record (no ts) renders safely under 'Earlier' with no time");
 
+  // Probe 8: one-time forced reset to 24 for existing users
+  console.log("\n[Probe 8] Forced reset to 24 questions");
+  // legacy settings with count 48 and no forced24 flag
+  env = launch({ localStorage: { "nnat-settings": JSON.stringify({ count: 48, level: "A", types: ["pattern", "analogy"] }) } });
+  let sv = JSON.parse(env.window.localStorage.getItem("nnat-settings"));
+  if (sv.count !== 24) note(`Existing count 48 not forced to 24 (got ${sv.count})`);
+  else if (!sv.forced24) note("forced24 flag not persisted");
+  else ok("Existing user reset to 24 (flag persisted)");
+  // after the forced reset the user can still choose a different count, and it sticks
+  click(env.window, env.document.getElementById("open-settings"));
+  click(env.window, env.document.querySelector('#set-count [data-count="48"]'));
+  sv = JSON.parse(env.window.localStorage.getItem("nnat-settings"));
+  if (sv.count !== 48) note("User change after reset did not persist");
+  // a brand-new reload with that saved (forced24:true, count:48) must KEEP 48
+  const env2 = launch({ localStorage: { "nnat-settings": JSON.stringify(sv) } });
+  _envs.push(env2);
+  const sv2 = JSON.parse(env2.window.localStorage.getItem("nnat-settings"));
+  if (sv2.count !== 48) note(`Reset re-applied (should only happen once); got ${sv2.count}`);
+  else ok("After the one-time reset, user's choice is respected on later loads");
+
   const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));
   else ok(`no runtime errors across ${_envs.length} sessions`);

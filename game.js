@@ -74,7 +74,16 @@
       const saved = JSON.parse(localStorage.getItem("nnat-settings")) || {};
       const s = Object.assign({}, DEFAULTS, saved);
       if (!levelTypes(s.level).length) s.level = "A";
-      return sanitizeTypes(s);
+      sanitizeTypes(s);
+      // one-time forced reset: everyone starts at 24 questions, then may change it
+      if (!s.forced24) {
+        s.count = 24;
+        s.forced24 = true;
+        try {
+          localStorage.setItem("nnat-settings", JSON.stringify(s));
+        } catch (e) {}
+      }
+      return s;
     } catch (e) {
       return sanitizeTypes(Object.assign({}, DEFAULTS, { types: DEFAULTS.types.slice() }));
     }
