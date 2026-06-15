@@ -858,6 +858,13 @@
     sfx("tap");
   });
 
+  // Refresh button (iOS home-screen apps have no browser reload)
+  $("refresh-btn").addEventListener("click", () => {
+    try {
+      location.reload();
+    } catch (e) {}
+  });
+
   $("start-btn").addEventListener("click", startGame);
   $("open-settings").addEventListener("click", openSettings);
   $("settings-done").addEventListener("click", () => show(startScreen));

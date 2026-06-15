@@ -27,7 +27,40 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 40px); /* room for the fixed top bar */
 }
+
+/* always-visible top bar with a Refresh button (iOS home-screen apps have no
+   browser reload). Sits above every screen, below the iOS status bar. */
+#apptop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 5px) 8px 5px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 1px 6px rgba(60, 50, 120, 0.08);
+}
+.refresh-btn {
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--accent);
+  background: #fff;
+  border: 2px solid #e6e8f5;
+  border-radius: 999px;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.refresh-btn:hover { background: #f1ecff; }
+.refresh-btn:active { transform: scale(0.96); }
 
 #app {
   flex: 1;
@@ -501,6 +534,9 @@ body {
 
 /* Very short screens (phones held sideways): trim everything down. */
 @media (orientation: landscape) and (max-height: 480px) {
+  body { padding-top: calc(env(safe-area-inset-top, 0px) + 32px); }
+  #apptop { padding: calc(env(safe-area-inset-top, 0px) + 3px) 8px 3px; }
+  .refresh-btn { padding: 3px 12px; font-size: 0.8rem; }
   .topbar { margin-bottom: 8px; }
   .quiz-main { padding: 12px; gap: 16px; }
   .qtype-badge { margin-bottom: 6px; }

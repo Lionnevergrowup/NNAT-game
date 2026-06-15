@@ -317,6 +317,21 @@ async function playGame(env, strategy) {
     note(`Level C from home missing types: ${[...tset]}`);
   else ok(`Home Level C unlocks all four types: ${[...tset].length} present`);
 
+  // ---- Playthrough 13: global Refresh button present on every screen ----
+  console.log("\n[Playthrough 13] Refresh button always available");
+  env = launch();
+  const rb = env.document.getElementById("refresh-btn");
+  if (!rb) note("Refresh button missing");
+  else {
+    // visible on the start screen (it lives in a fixed top bar outside #app)
+    const onStart = !env.document.getElementById("apptop").classList.contains("hidden");
+    // still present after entering the quiz
+    click(env.window, env.document.getElementById("start-btn"));
+    const stillThere = !!env.document.getElementById("refresh-btn");
+    if (onStart && stillThere) ok("Refresh button present on start and quiz screens");
+    else note("Refresh button not consistently present");
+  }
+
   // no runtime errors should have surfaced in any handler across all sessions
   const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));
