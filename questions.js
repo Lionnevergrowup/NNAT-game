@@ -52,11 +52,9 @@
       case "heart":
         return heart(c, c, r, color);
       case "arrow":
-        // an upward arrow — clearly asymmetric so rotation is visible
-        return (
-          `<polygon points="${c},${size * 0.12} ${size * 0.78},${size * 0.52} ${size * 0.22},${size * 0.52}" fill="${color}"/>` +
-          `<rect x="${c - size * 0.1}" y="${size * 0.5}" width="${size * 0.2}" height="${size * 0.36}" rx="${size * 0.03}" fill="${color}"/>`
-        );
+        // an upward arrow as a SINGLE polygon (so the outline has no seam);
+        // clearly asymmetric so rotation is visible
+        return `<polygon points="${c},${size * 0.1} ${size * 0.8},${size * 0.5} ${size * 0.6},${size * 0.5} ${size * 0.6},${size * 0.88} ${size * 0.4},${size * 0.88} ${size * 0.4},${size * 0.5} ${size * 0.2},${size * 0.5}" fill="${color}"/>`;
       case "flag":
         // a little flag on a pole — also orientation dependent
         return (
