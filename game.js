@@ -45,6 +45,7 @@
   let index = 0;
   let score = 0;
   let locked = false;
+  let retrying = false; // true after a first wrong answer, while a retry is allowed
   let streak = 0;
   let bestStreak = 0;
 
@@ -252,7 +253,7 @@
 
   // ---- Game flow ------------------------------------------------------
   const PRAISE = ["Awesome!", "Great job!", "You got it!", "Nice work!", "Yes!", "Super!", "Brilliant!"];
-  const TRY_AGAIN = ["Good try!", "Almost!", "Keep going!"];
+  const RETRY = ["Not quite — try again!", "Almost! Pick another one.", "Good try! Have another go."];
 
   let qStart = 0; // timestamp when the current question was shown
   const nowMs = () => (window.performance && performance.now ? performance.now() : Date.now());
@@ -284,6 +285,8 @@
 
   function renderQuestion() {
     locked = false;
+    retrying = false;
+    nextBtn.style.display = "";
     document.querySelectorAll(".fly").forEach((e) => e.remove());
     const q = questions[index];
 
@@ -320,63 +323,98 @@
     feedbackEmoji.classList.add("bounce");
   }
 
-  function choose(i, btn) {
-    if (locked) return;
-    locked = true;
-
-    const q = questions[index];
-    const correct = i === q.answer;
-    const dt = Math.max(0, nowMs() - qStart);
-    recordAnswer(q.type || "Puzzle", correct, dt);
-    const allBtns = Array.from(optionsEl.children);
-
-    allBtns.forEach((b, bi) => {
-      b.disabled = true;
-      if (bi === q.answer) b.classList.add("correct");
-    });
-
-    if (correct) {
-      score += 1;
-      streak += 1;
-      bestStreak = Math.max(bestStreak, streak);
-      scoreEl.textContent = String(score);
-      updateStreak();
-      btn.classList.add("picked-correct");
-
-      const milestone = streak >= 3 && (streak === 3 || streak % 5 === 0);
-      feedbackEmoji.textContent = milestone ? "🔥" : "🌟";
-      feedbackText.textContent = milestone
-        ? `${streak} in a row!`
-        : PRAISE[Math.floor(Math.random() * PRAISE.length)];
-      sfx(milestone ? "streak" : "correct");
-      burst(true);
-      bounceMascot();
-      animateFill(btn, false);
-      speak(feedbackText.textContent);
-    } else {
-      streak = 0;
-      updateStreak();
-      btn.classList.add("wrong");
-      feedbackEmoji.textContent = "💡";
-      feedbackText.textContent =
-        TRY_AGAIN[Math.floor(Math.random() * TRY_AGAIN.length)] + " That piece does not fit. The glowing one is right.";
-      sfx("wrong");
-      animateFill(btn, true);
-      speak(feedbackText.textContent);
-      scheduleSimilar(q); // gently follow up with similar-but-different items
-    }
-
+  // shows the feedback row + Next button and advances the progress bar
+  function finishFeedback() {
+    nextBtn.style.display = "";
     nextBtn.textContent = index === questions.length - 1 ? "See My Stars ⭐" : "Next ▶";
     feedbackEl.classList.remove("hidden");
     progressFill.style.width = `${((index + 1) / questions.length) * 100}%`;
   }
 
+  function choose(i, btn) {
+    if (locked) return;
+    const q = questions[index];
+    const correct = i === q.answer;
+    const allBtns = Array.from(optionsEl.children);
+
+    if (!retrying) {
+      // ---- first attempt: this is the one that counts in the stats ----
+      const dt = Math.max(0, nowMs() - qStart);
+      recordAnswer(q.type || "Puzzle", correct, dt);
+
+      if (correct) {
+        locked = true;
+        score += 1;
+        streak += 1;
+        bestStreak = Math.max(bestStreak, streak);
+        scoreEl.textContent = String(score);
+        updateStreak();
+        allBtns.forEach((b, bi) => {
+          b.disabled = true;
+          if (bi === q.answer) b.classList.add("correct");
+        });
+        btn.classList.add("picked-correct");
+        const milestone = streak >= 3 && (streak === 3 || streak % 5 === 0);
+        feedbackEmoji.textContent = milestone ? "🔥" : "🌟";
+        feedbackText.textContent = milestone ? `${streak} in a row!` : PRAISE[Math.floor(Math.random() * PRAISE.length)];
+        sfx(milestone ? "streak" : "correct");
+        burst(true);
+        bounceMascot();
+        animateFill(btn, false);
+        speak(feedbackText.textContent);
+        finishFeedback();
+      } else {
+        // first wrong: count it wrong, but DON'T reveal — let them try once more
+        streak = 0;
+        updateStreak();
+        retrying = true;
+        btn.classList.add("wrong");
+        btn.disabled = true; // can't pick this wrong one again
+        feedbackEmoji.textContent = "🤔";
+        feedbackText.textContent = RETRY[Math.floor(Math.random() * RETRY.length)];
+        sfx("wrong");
+        speak(feedbackText.textContent);
+        scheduleSimilar(q); // adaptive follow-ups are based on the first (wrong) answer
+        nextBtn.style.display = "none"; // no Next yet — they must choose again
+        feedbackEl.classList.remove("hidden");
+      }
+    } else {
+      // ---- retry (second) attempt: NOT recorded, NOT scored ----
+      locked = true;
+      if (correct) {
+        allBtns.forEach((b) => (b.disabled = true));
+        btn.classList.add("picked-correct");
+        allBtns[q.answer].classList.add("correct");
+        feedbackEmoji.textContent = "🌟";
+        feedbackText.textContent = "You got it!";
+        sfx("correct");
+        burst(true);
+        bounceMascot();
+        animateFill(btn, false); // reveal the completed picture
+        speak("You got it!");
+      } else {
+        allBtns.forEach((b, bi) => {
+          b.disabled = true;
+          if (bi === q.answer) b.classList.add("correct");
+        });
+        btn.classList.add("wrong");
+        feedbackEmoji.textContent = "💡";
+        feedbackText.textContent = "That one does not fit. The glowing piece is right.";
+        sfx("wrong");
+        animateFill(allBtns[q.answer], false); // show the correct answer in the slot
+        speak(feedbackText.textContent);
+      }
+      finishFeedback();
+    }
+  }
+
   // Fly the chosen tile into the "?" hole.
   function animateFill(btn, leaveInHole) {
     const q = questions[index];
+    const myIndex = index; // guard: don't touch the stimulus if we've moved on
     const svgEl = stimulusEl.querySelector("svg");
     if (!q.hole || !q.vb || !svgEl) {
-      if (!leaveInHole && q.solved) stimulusEl.innerHTML = q.solved;
+      if (!leaveInHole && q.solved && index === myIndex) stimulusEl.innerHTML = q.solved;
       return;
     }
     const srect = svgEl.getBoundingClientRect();
@@ -409,18 +447,21 @@
     );
 
     setTimeout(() => {
-      if (leaveInHole) {
-        const cont = stimulusEl.getBoundingClientRect();
-        const ov = document.createElement("div");
-        ov.className = "hole-fill";
-        ov.innerHTML = art.innerHTML;
-        ov.style.left = holeLeft - cont.left + "px";
-        ov.style.top = holeTop - cont.top + "px";
-        ov.style.width = holeW + "px";
-        ov.style.height = holeH + "px";
-        stimulusEl.appendChild(ov);
-      } else {
-        stimulusEl.innerHTML = q.solved;
+      // if the player already advanced to the next question, don't repaint it
+      if (index === myIndex) {
+        if (leaveInHole) {
+          const cont = stimulusEl.getBoundingClientRect();
+          const ov = document.createElement("div");
+          ov.className = "hole-fill";
+          ov.innerHTML = art.innerHTML;
+          ov.style.left = holeLeft - cont.left + "px";
+          ov.style.top = holeTop - cont.top + "px";
+          ov.style.width = holeW + "px";
+          ov.style.height = holeH + "px";
+          stimulusEl.appendChild(ov);
+        } else {
+          stimulusEl.innerHTML = q.solved;
+        }
       }
       fly.classList.add("landed");
       setTimeout(() => fly.remove(), 160);
@@ -934,7 +975,7 @@
       return;
     }
     if (!quizScreen.classList.contains("hidden")) {
-      if (!feedbackEl.classList.contains("hidden") && (e.key === "Enter" || e.key === " ")) {
+      if (locked && !feedbackEl.classList.contains("hidden") && (e.key === "Enter" || e.key === " ")) {
         e.preventDefault();
         stopSpeaking();
         next();

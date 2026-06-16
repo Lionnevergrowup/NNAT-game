@@ -15,15 +15,10 @@ const tick = (ms) => new Promise((r) => setTimeout(r, ms));
 function playAll(env, strategy) {
   const d = env.document;
   click(env.window, d.getElementById("start-btn"));
-  const deck = env.decks[env.decks.length - 1];
   const total = parseInt(d.getElementById("q-total").textContent, 10);
-  const qs = deck.slice(0, total);
   return (async () => {
     for (let i = 0; i < total; i++) {
-      const ans = qs[i].answer;
-      const idx = strategy === "correct" ? ans : strategy === "wrong" ? (ans + 1) % 5 : i % 5;
-      click(env.window, d.getElementById("options").children[idx]);
-      await tick(50);
+      await H.answerOne(env, strategy, i); // handles the two-attempt retry flow
       click(env.window, d.getElementById("next-btn"));
     }
   })();
@@ -123,10 +118,9 @@ function playAll(env, strategy) {
   const missed = { g: env.live.q.g, sub: env.live.q.sub };
   for (let i = 0; i < 6; i++) {
     seq.push({ g: env.live.q.g, sub: env.live.q.sub });
-    const ans = env.live.q.answer;
-    const idx = i === 0 ? (ans + 1) % 5 : ans; // miss Q1, then answer correctly
-    click(env.window, env.document.getElementById("options").children[idx]);
-    await tick(60);
+    // miss Q1 entirely (wrong both tries -> records wrong, triggers follow-ups);
+    // answer the rest correctly on the first try
+    await H.answerOne(env, i === 0 ? "wrong" : "correct", i);
     click(env.window, env.document.getElementById("next-btn"));
   }
   const matchAt2 = seq[2] && seq[2].g === missed.g && seq[2].sub === missed.sub;
@@ -182,6 +176,54 @@ function playAll(env, strategy) {
   const sv2 = JSON.parse(env2.window.localStorage.getItem("nnat-settings"));
   if (sv2.count !== 48) note(`Reset re-applied (should only happen once); got ${sv2.count}`);
   else ok("After the one-time reset, user's choice is respected on later loads");
+
+  // Probe 9: retry flow — first wrong gives a second chance; stats keep the wrong
+  console.log("\n[Probe 9] Retry on wrong answer + stats stay 'wrong'");
+  env = launch();
+  const d = env.document;
+  const optsOf = () => d.getElementById("options").children;
+  click(env.window, d.getElementById("start-btn"));
+  // Q1: pick wrong first
+  let ans = env.live.q.answer;
+  const wrong1 = (ans + 1) % 5;
+  click(env.window, optsOf()[wrong1]);
+  await tick(30);
+  if (d.getElementById("next-btn").style.display !== "none") note("Next not hidden during retry");
+  if ([...optsOf()].some((o) => o.classList.contains("correct"))) note("Answer revealed on first wrong (should not)");
+  if (!optsOf()[wrong1].disabled) note("Tried wrong option not disabled for the retry");
+  // retry: pick correct
+  click(env.window, optsOf()[ans]);
+  await tick(700);
+  if (!/got it/i.test(d.getElementById("feedback-text").textContent)) note("No 'You got it' on retry-correct");
+  if (d.getElementById("score").textContent !== "0") note("Retry-correct incremented the score (should not)");
+  let st = JSON.parse(env.window.localStorage.getItem("nnat-stats"));
+  if (!(st.answered === 1 && st.correct === 0)) note(`Stats after retry-correct: a=${st.answered} c=${st.correct} (want 1/0)`);
+  click(env.window, d.getElementById("next-btn"));
+  // Q2: wrong twice -> reveal the answer
+  ans = env.live.q.answer;
+  click(env.window, optsOf()[(ans + 1) % 5]);
+  await tick(30);
+  click(env.window, optsOf()[(ans + 2) % 5]);
+  await tick(700);
+  const marked = [...optsOf()].findIndex((o) => o.classList.contains("correct"));
+  if (marked !== ans) note("Answer not revealed after second wrong");
+  st = JSON.parse(env.window.localStorage.getItem("nnat-stats"));
+  if (!(st.answered === 2 && st.correct === 0)) note(`Stats after two wrongs: a=${st.answered} c=${st.correct} (want 2/0)`);
+  ok("Retry checks done (first wrong recorded; retry-correct unscored; 2nd wrong reveals)");
+
+  // Probe 10: tapping Next before the reveal animation finishes must not
+  // overwrite the next question's picture (stale animateFill timeout)
+  console.log("\n[Probe 10] Fast Next does not corrupt the next question");
+  env = launch();
+  const dd = env.document;
+  click(env.window, dd.getElementById("start-btn"));
+  const a0 = env.live.q.answer;
+  click(env.window, dd.getElementById("options").children[a0]); // correct -> schedules a 620ms reveal
+  click(env.window, dd.getElementById("next-btn")); // advance immediately (before 620ms)
+  await tick(700); // let the stale reveal timeout fire
+  const stim = dd.getElementById("stimulus").innerHTML;
+  if (!stim.includes(">?<")) note("Stale reveal overwrote the next question's stimulus");
+  else ok("Next question still shows its '?' after a fast Next");
 
   const runtimeErrors = _envs.reduce((a, e) => a.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 6).join(" | "));

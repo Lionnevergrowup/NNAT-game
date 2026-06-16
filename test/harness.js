@@ -123,4 +123,30 @@ function byId(document, id) {
   return document.getElementById(id);
 }
 
-module.exports = { launch, visibleScreen, click, byId };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Answer the current question, handling the two-attempt retry flow:
+//  - "correct": pick the answer (resolves on first try)
+//  - "wrong":   pick wrong, then a different wrong (reveals the answer)
+//  - "mixed":   pick i%n; if wrong, get it right on the retry
+// Returns { firstCorrect } so callers can tally score (only first tries count).
+async function answerOne(env, strategy, i) {
+  const d = env.document;
+  const w = env.window;
+  const opts = () => d.getElementById("options").children;
+  const ans = env.live.q.answer;
+  const n = opts().length;
+  const firstIdx = strategy === "correct" ? ans : strategy === "wrong" ? (ans + 1) % n : i % n;
+  const firstCorrect = firstIdx === ans;
+  click(w, opts()[firstIdx]);
+  if (!firstCorrect) {
+    await sleep(20);
+    let second = strategy === "wrong" ? (ans + 2) % n : ans;
+    if (second === firstIdx) second = (firstIdx + 1) % n;
+    click(w, opts()[second]);
+  }
+  await sleep(700); // let animateFill resolve
+  return { firstCorrect };
+}
+
+module.exports = { launch, visibleScreen, click, byId, sleep, answerOne };

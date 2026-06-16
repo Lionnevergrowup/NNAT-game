@@ -101,9 +101,13 @@ bar is a quick mute; finer control (speed, effects) is on the Settings page.
 
 - Pick how many questions, then tap **Start Playing**.
 - Listen to the question (or tap **Listen**), look at the puzzle, then tap an answer.
-- Get a ⭐ for each correct answer; see how many stars you earn at the end.
+- A first wrong answer gives a **second try** (the answer isn't shown yet). Getting
+  it on the retry is encouraged but still scored as a miss; a second wrong reveals
+  the answer.
+- Get a ⭐ for each first-try correct answer; see how many stars you earn at the end.
+- A 🔄 **Refresh** button sits at the top (handy for iOS home-screen use).
 - **Play Again** returns to the start screen so you can choose a new amount.
-- Keyboard friendly: press **1–4** to choose, **Enter/Space** for the next question.
+- Keyboard friendly: press **1–5** to choose, **Enter/Space** for the next question.
 
 ## Run locally
 

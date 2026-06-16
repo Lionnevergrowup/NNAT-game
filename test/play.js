@@ -43,26 +43,15 @@ async function playGame(env, strategy) {
     const opts = Array.from($("options").children);
     if (opts.length !== 5) note(`Q${i + 1}: expected 5 options, got ${opts.length}`);
 
-    // read the LIVE current question (adaptive may have swapped it in)
-    const ans = env.live.q.answer;
-    let choiceIdx;
-    if (strategy === "correct") choiceIdx = ans;
-    else if (strategy === "wrong") choiceIdx = (ans + 1) % 5;
-    else choiceIdx = i % 5; // mixed
+    const ans = env.live.q.answer; // live (adaptive may have swapped it in)
+    const r = await H.answerOne(env, strategy, i); // handles the retry flow
+    if (r.firstCorrect) expectedScore++; // only first attempts count
 
-    const correct = choiceIdx === ans;
-    if (correct) expectedScore++;
-
-    click(window, opts[choiceIdx]);
-
-    // feedback should be visible, and the correct option marked
+    // once resolved, feedback shown and the correct option marked
     if ($("feedback").classList.contains("hidden")) note(`Q${i + 1}: feedback not shown after answering`);
-    const markedCorrect = opts.findIndex((o) => o.classList.contains("correct"));
+    const markedCorrect = Array.from($("options").children).findIndex((o) => o.classList.contains("correct"));
     if (markedCorrect !== ans) note(`Q${i + 1}: correct marker on ${markedCorrect}, expected ${ans}`);
 
-    await tick(window, 700); // let animateFill resolve
-
-    // next
     click(window, $("next-btn"));
   }
 
@@ -180,8 +169,7 @@ async function playGame(env, strategy) {
   click(env.window, env.document.getElementById("start-btn"));
   // answer 2 questions then bail
   for (let i = 0; i < 2; i++) {
-    click(env.window, env.document.getElementById("options").children[0]);
-    await tick(env.window, 700);
+    await H.answerOne(env, "mixed", i);
     click(env.window, env.document.getElementById("next-btn"));
   }
   click(env.window, env.document.getElementById("quit-btn"));
@@ -280,12 +268,9 @@ async function playGame(env, strategy) {
   click(env.window, env.document.getElementById("start-btn"));
   let answered = 0;
   for (let i = 0; i < 20; i++) {
-    const optsEl = env.document.getElementById("options");
-    if (!optsEl.children.length) break;
-    // click option 0 then, if it was correct, it still counts; we just need to advance
-    click(env.window, optsEl.children[0]);
+    if (!env.document.getElementById("options").children.length) break;
+    await H.answerOne(env, "wrong", i); // wrong twice -> reveal, exercises retry + adaptive
     answered++;
-    await tick(env.window, 60);
     click(env.window, env.document.getElementById("next-btn"));
   }
   if (answered !== 20) note(`Adaptive run answered ${answered} (expected 20)`);
