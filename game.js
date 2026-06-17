@@ -899,11 +899,18 @@
     sfx("tap");
   });
 
-  // Refresh button (iOS home-screen apps have no browser reload)
+  // Refresh button. iOS home-screen apps cache aggressively and a plain
+  // reload often re-uses cached JS/CSS, so reload via a fresh URL (cache-bust)
+  // to pull the latest version.
   $("refresh-btn").addEventListener("click", () => {
     try {
-      location.reload();
-    } catch (e) {}
+      const base = location.href.split("#")[0].split("?")[0];
+      location.replace(base + "?r=" + Date.now());
+    } catch (e) {
+      try {
+        location.reload();
+      } catch (_) {}
+    }
   });
 
   $("start-btn").addEventListener("click", startGame);
