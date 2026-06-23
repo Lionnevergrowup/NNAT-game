@@ -101,7 +101,8 @@ async function playGame(env, strategy) {
     const cards = d.querySelectorAll("#stat-summary .stat-card").length;
     if (cards !== 5) note(`Expected 5 summary cards, got ${cards}`);
     const bars = d.querySelectorAll("#type-bars .bar-row").length;
-    if (bars !== 4) note(`Expected 4 type bars, got ${bars}`);
+    // Level A only has Pattern + Analogy, so only those can be charted (1–2 bars)
+    if (bars < 1 || bars > 2) note(`Expected 1–2 type bars at Level A, got ${bars}`);
     ok(`Progress: ${cards} cards, ${bars} type bars, recent rows ${d.querySelectorAll("#recent-list .recent-row").length}`);
   }
 

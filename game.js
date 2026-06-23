@@ -846,18 +846,32 @@
       }
     });
 
-    $("type-bars").innerHTML = ALL_TYPES.map((t) => {
-      const d = stats.byType[t] || { a: 0, c: 0, ms: 0 };
-      const p = pct(d.c, d.a);
-      const avg = d.a ? (d.ms / d.a / 1000).toFixed(1) + "s" : "";
-      const slow = d.a && t === slowest && ALL_TYPES.filter((x) => stats.byType[x].a).length > 1;
-      return `<div class="bar-row">
+    // show a bar only for types that have been practiced; list the rest below
+    const practiced = ALL_TYPES.filter((t) => (stats.byType[t] || {}).a > 0);
+    let barsHtml = practiced
+      .map((t) => {
+        const d = stats.byType[t];
+        const p = pct(d.c, d.a);
+        const avg = (d.ms / d.a / 1000).toFixed(1) + "s";
+        const slow = t === slowest && practiced.length > 1;
+        return `<div class="bar-row">
           <div class="bar-top"><span>${TYPE_SHORT[t] || t}${slow ? ' <span class="slow-tag">🐢 slowest</span>' : ""}</span><span class="bar-val">${
-        d.a ? p + "% · " + d.c + "/" + d.a + (avg ? " · " + avg : "") : "—"
-      }</span></div>
-          <div class="bar"><div class="bar-fill" style="width:${d.a ? p : 0}%"></div></div>
+          p + "% · " + d.c + "/" + d.a + " · " + avg
+        }</span></div>
+          <div class="bar"><div class="bar-fill" style="width:${p}%"></div></div>
         </div>`;
-    }).join("");
+      })
+      .join("");
+    const untouched = ALL_TYPES.filter((t) => !((stats.byType[t] || {}).a > 0));
+    if (untouched.length) {
+      const hints = [];
+      if (untouched.indexOf("Serial Reasoning") !== -1) hints.push("➡️ Sequences starts at Level B");
+      if (untouched.indexOf("Spatial Visualization") !== -1) hints.push("🔄 Turns starts at Level C");
+      barsHtml += `<p class="set-note">Not practiced yet: ${untouched.map((t) => TYPE_SHORT[t] || t).join(", ")}.${
+        hints.length ? " " + hints.join("; ") + "." : ""
+      }</p>`;
+    }
+    $("type-bars").innerHTML = barsHtml;
 
     const rec = stats.recent.slice().reverse();
     if (!rec.length) {

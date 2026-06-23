@@ -80,7 +80,7 @@ view of play history, stored locally in the browser:
 
 - Summary cards: games played, questions answered, overall accuracy, best streak, **average time per question**.
 - **Accuracy trend** — a small SVG line chart of accuracy over recent games.
-- **Accuracy & speed by puzzle type** — bars with each type's accuracy and average answer time, flagging the **slowest** type (🐢).
+- **Accuracy & speed by puzzle type** — a bar for each *practiced* type (accuracy + average answer time, flagging the **slowest** 🐢); types not yet played are listed below with the level that unlocks them (Sequences@B, Turns@C).
 - Recent games **grouped by date** (Today / Yesterday / date) with score and stars.
 - A **Reset stats** button to clear the history.
 

@@ -66,8 +66,8 @@ function playAll(env, strategy) {
   if (activeLevel && activeCount && activeTypes === 2 && hiddenTypes === 2 && voiceOn && speedNormal)
     ok("Defaults render correctly (Level A, 24, 2 visible types, voice On, Normal)");
 
-  // Probe 3: only-one-type game leaves other types at "—" in progress
-  console.log("\n[Probe 3] Untouched type shows —");
+  // Probe 3: only-one-type game shows one bar; the rest are listed as "not practiced"
+  console.log("\n[Probe 3] Only practiced types get a bar");
   env = launch();
   click(env.window, env.document.getElementById("open-settings"));
   env.document.querySelectorAll("#set-types .chip").forEach((c) => {
@@ -78,9 +78,11 @@ function playAll(env, strategy) {
   await playAll(env, "mixed");
   click(env.window, env.document.getElementById("open-progress-2"));
   const bars = Array.from(env.document.querySelectorAll("#type-bars .bar-row"));
-  const dashed = bars.filter((b) => b.querySelector(".bar-val").textContent.trim() === "—").length;
-  if (dashed !== 3) note(`Expected 3 untouched type bars showing —, got ${dashed}`);
-  else ok("Untouched puzzle types correctly show — (played only Patterns)");
+  const noteTxt = env.document.getElementById("type-bars").textContent;
+  if (bars.length !== 1) note(`Expected 1 bar (Patterns only), got ${bars.length}`);
+  else if (!/Not practiced yet/.test(noteTxt)) note("Missing 'Not practiced yet' note");
+  else if (!/Turns/.test(noteTxt) || !/Sequences/.test(noteTxt)) note("Untouched types not listed in note");
+  else ok("Only Patterns charted; others listed as not practiced (Turns@C, Sequences@B)");
 
   // Probe 4: Reset stats -> empty state
   console.log("\n[Probe 4] Reset stats");
