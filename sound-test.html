@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Sound test</title>
+<style>
+body{font:18px -apple-system,system-ui,sans-serif;margin:0;padding:24px;max-width:640px;margin:auto}
+button{display:block;width:100%;font:inherit;font-weight:700;padding:18px;margin:12px 0;border:0;border-radius:14px;background:#6c5ce7;color:#fff}
+pre{background:#f4f4f8;padding:12px;border-radius:10px;white-space:pre-wrap;font-size:14px}
+</style></head><body>
+<h1>Sound test</h1>
+<p>Tap each button and tell me which ones you HEAR.</p>
+<button id="b1">1 · Audio element (beep)</button>
+<button id="b2">2 · Web Audio (beep)</button>
+<button id="b3">3 · Voice (speech)</button>
+<button id="b4">4 · Audio element, playback session</button>
+<pre id="log"></pre>
+<script>
+var log=document.getElementById("log");
+function L(t){log.textContent+=t+"\n";}
+function wav(){var r=22050,n=r*0.5,b=new ArrayBuffer(44+n*2),d=new DataView(b);
+function w(o,s){for(var i=0;i<s.length;i++)d.setUint8(o+i,s.charCodeAt(i));}
+w(0,"RIFF");d.setUint32(4,36+n*2,true);w(8,"WAVE");w(12,"fmt ");d.setUint32(16,16,true);d.setUint16(20,1,true);d.setUint16(22,1,true);d.setUint32(24,r,true);d.setUint32(28,r*2,true);d.setUint16(32,2,true);d.setUint16(34,16,true);w(36,"data");d.setUint32(40,n*2,true);
+for(var i=0;i<n;i++)d.setInt16(44+i*2,Math.sin(2*Math.PI*660*i/r)*20000*(1-i/n),true);
+var s="",u=new Uint8Array(b);for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return "data:audio/wav;base64,"+btoa(s);}
+L("standalone="+(navigator.standalone||false)+"  audioSession="+(navigator.audioSession?navigator.audioSession.type:"n/a"));
+L("UA="+navigator.userAgent);
+document.getElementById("b1").onclick=function(){
+  var a=new Audio(wav());a.play().then(function(){L("1 play() ok")},function(e){L("1 play() FAILED: "+e)});};
+document.getElementById("b2").onclick=function(){
+  try{var C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();
+  L("2 ctx state="+c.state);c.resume().then(function(){L("2 resumed state="+c.state)},function(e){L("2 resume FAILED "+e)});
+  o.frequency.value=660;g.gain.value=0.5;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.5);
+  setTimeout(function(){L("2 clock="+c.currentTime.toFixed(2))},700);}catch(e){L("2 error "+e)}};
+document.getElementById("b3").onclick=function(){
+  try{var s=speechSynthesis,u=new SpeechSynthesisUtterance("Sound test. Can you hear me?");u.lang="en-US";
+  u.onstart=function(){L("3 speech started")};u.onend=function(){L("3 speech ended")};u.onerror=function(e){L("3 speech error "+e.error)};
+  s.speak(u);L("3 voices="+s.getVoices().length)}catch(e){L("3 error "+e)}};
+document.getElementById("b4").onclick=function(){
+  try{if(navigator.audioSession){navigator.audioSession.type="playback";L("4 audioSession=playback")}else L("4 no audioSession API");}catch(e){L("4 err "+e)}
+  var a=new Audio(wav());a.play().then(function(){L("4 play() ok")},function(e){L("4 play() FAILED: "+e)});};
+</script></body></html>
