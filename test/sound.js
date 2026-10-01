@@ -264,6 +264,30 @@ const state = (env) => env.audioCtxs.map((c) => c.state).join(",");
   if (o2 !== 0) note("tones played although Fun sounds are Off");
   else ok("sfx Off → no tones in play (speech still allowed)");
 
+  // ---- 9. audio-element engine ----
+  console.log("\n[Sound 9] Audio-element effects engine");
+  env = launch({ standalone: true, localStorage: withSettings() });
+  click(env.window, env.document.getElementById("start-btn"));
+  click(env.window, env.document.getElementById("options").children[env.live.q.answer]);
+  await sleep(150);
+  const wavs = env.audioEls.filter((u) => u.startsWith("data:audio/wav;base64,UklGR"));
+  if (!wavs.length) note("Home-Screen mode: effects did not use the audio element");
+  else if (env.audioCtxs.reduce((n, c) => n + c.oscStarts, 0) !== 0) note("Both engines played (double sound)");
+  else ok(`Home-Screen app → audio element engine (${wavs.length} wav), no Web Audio tones`);
+  env = launch({ localStorage: withSettings({ engine: "element" }) });
+  click(env.window, env.document.getElementById("open-settings"));
+  click(env.window, env.document.getElementById("test-chime"));
+  await sleep(100);
+  if (!env.audioEls.length) note("engine=element in a tab did not use the audio element");
+  else if (!/Effects engine: audio element \(element\)/.test(env.document.getElementById("sound-check-result").textContent)) note("panel does not show the engine");
+  else ok("engine=element forced in a tab; panel shows it");
+  env = launch({ standalone: true, localStorage: withSettings({ engine: "webaudio" }) });
+  click(env.window, env.document.getElementById("open-settings"));
+  click(env.window, env.document.getElementById("test-chime"));
+  await sleep(100);
+  if (env.audioEls.length || env.audioCtxs.reduce((n, c) => n + c.oscStarts, 0) < 1) note("engine=webaudio override ignored in Home-Screen mode");
+  else ok("engine=webaudio override respected even in Home-Screen mode");
+
   const runtimeErrors = _envs.reduce((acc, e) => acc.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 5).join(" | "));
   else ok(`no runtime errors across ${_envs.length} sessions`);

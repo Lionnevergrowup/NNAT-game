@@ -147,6 +147,15 @@ function launch(opts = {}) {
       connect: () => ({ connect: () => {} }),
     });
   }
+  const audioEls = [];
+  window.Audio = function (src) {
+    this.src = src;
+    this.play = () => {
+      audioEls.push(src);
+      return Promise.resolve();
+    };
+  };
+  if (opts.standalone) Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true });
   window.AudioContext = FakeAudio;
   window.webkitAudioContext = FakeAudio;
   if (opts.audioSession)
@@ -184,7 +193,7 @@ function launch(opts = {}) {
 
   window.eval(gjs);
 
-  return { dom, window, document, spoken, tones, decks, live, errors, audioCtxs, audioCfg, speechCfg, speechLog, utterances, synthState };
+  return { dom, window, document, spoken, tones, decks, live, errors, audioCtxs, audioEls, audioCfg, speechCfg, speechLog, utterances, synthState };
 }
 
 // helpers --------------------------------------------------------------

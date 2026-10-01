@@ -70,6 +70,7 @@
     voice: true,
     speed: "normal",
     sfx: true,
+    engine: "auto", // sound-effects engine: auto | webaudio | element
     loud: true, // claim the iOS "playback" audio session so sound ignores the mute switch
     fx: true,
   };
@@ -338,24 +339,87 @@
     o.stop(now + dur + 0.02);
   }
   // `force` lets the Sound check play even when fun sounds are switched off.
+  // One table drives both engines: [freq Hz, start s, duration s, gain, wave]
+  const SFX_DEFS = {
+    correct: [[660, 0, 0.13, 0.22], [880, 0.1, 0.2, 0.22]],
+    wrong: [[220, 0, 0.3, 0.2, "triangle"]],
+    streak: [[784, 0, 0.12, 0.22], [1047, 0.1, 0.2, 0.22]],
+    win: [523, 659, 784, 1047].map((f, i) => [f, i * 0.13, 0.28, 0.22]),
+    tap: [[440, 0, 0.06, 0.12]],
+  };
+
+  // ---- Audio-element engine ----------------------------------------------
+  // Normal <audio> playback uses iOS's media channel (ignores the mute switch),
+  // which is how most web games get sound in a Home-Screen app. We synthesise the
+  // same chimes into small WAV files at runtime — no asset files needed.
+  const wavCache = {};
+  function wavFor(kind) {
+    if (wavCache[kind]) return wavCache[kind];
+    const defs = SFX_DEFS[kind];
+    if (!defs || typeof btoa !== "function") return null;
+    const rate = 22050;
+    const total = Math.ceil(Math.max(...defs.map((d) => d[1] + d[2])) * rate) + 200;
+    const pcm = new Int16Array(total);
+    defs.forEach(([f, st, dur, gain, wave]) => {
+      const n0 = Math.floor(st * rate);
+      const n = Math.floor(dur * rate);
+      for (let i = 0; i < n; i++) {
+        const t = i / rate;
+        const env = Math.min(1, i / (0.02 * rate)) * Math.pow(1 - i / n, 1.5);
+        const ph = (t * f) % 1;
+        const w = wave === "triangle" ? 4 * Math.abs(ph - 0.5) - 1 : Math.sin(2 * Math.PI * ph);
+        const idx = n0 + i;
+        pcm[idx] = Math.max(-32767, Math.min(32767, pcm[idx] + w * env * (gain * 1.6) * 32767));
+      }
+    });
+    const bytes = new Uint8Array(44 + pcm.length * 2);
+    const dv = new DataView(bytes.buffer);
+    const wr = (o, str) => str.split("").forEach((ch, i) => dv.setUint8(o + i, ch.charCodeAt(0)));
+    wr(0, "RIFF"); dv.setUint32(4, 36 + pcm.length * 2, true); wr(8, "WAVE"); wr(12, "fmt ");
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    wr(36, "data"); dv.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++) dv.setInt16(44 + i * 2, pcm[i], true);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return (wavCache[kind] = "data:audio/wav;base64," + btoa(bin));
+  }
+  function playElement(kind) {
+    const src = wavFor(kind);
+    if (!src || typeof Audio !== "function") return false;
+    try {
+      const a = new Audio(src);
+      a.volume = 1;
+      const p = a.play();
+      diag.audio.elementPlays = (diag.audio.elementPlays || 0) + 1;
+      if (p && p.catch)
+        p.catch((e) => {
+          diag.audio.lastError = String(e && e.message ? e.message : e);
+          warn("audio element", e);
+        });
+      return true;
+    } catch (e) {
+      warn("playElement", e);
+      diag.audio.lastError = String(e);
+      return false;
+    }
+  }
+  // Settings: engine 'auto' | 'webaudio' | 'element'. Auto = audio element in a
+  // Home-Screen app (where Web Audio is unreliable), Web Audio in a normal tab.
+  function sfxEngine() {
+    const e = settings.engine;
+    if (e === "webaudio" || e === "element") return e;
+    return isStandalone() ? "element" : "webaudio";
+  }
+
+  // `force` lets the Sound check play even when fun sounds are switched off.
   function sfx(kind, force) {
     if (!force && !settings.sfx) return;
     try {
+      if (sfxEngine() === "element" && playElement(kind)) return;
       const c = wakeAudio();
       if (!c) return;
-      if (kind === "correct") {
-        tone(c, 660, 0, 0.13);
-        tone(c, 880, 0.1, 0.2);
-      } else if (kind === "wrong") {
-        tone(c, 220, 0, 0.3, 0.2, "triangle");
-      } else if (kind === "streak") {
-        tone(c, 784, 0, 0.12);
-        tone(c, 1047, 0.1, 0.2);
-      } else if (kind === "win") {
-        [523, 659, 784, 1047].forEach((f, i) => tone(c, f, i * 0.13, 0.28));
-      } else if (kind === "tap") {
-        tone(c, 440, 0, 0.06, 0.12);
-      }
+      (SFX_DEFS[kind] || []).forEach((d) => tone(c, d[0], d[1], d[2], d[3], d[4]));
     } catch (e) {
       warn("sfx", e);
       diag.audio.lastError = String(e);
@@ -785,6 +849,7 @@
     setActive("set-speed", "speed", settings.speed, false);
     setActive("set-sfx", "sfx", settings.sfx ? "on" : "off", false);
     setActive("set-loud", "loud", settings.loud ? "on" : "off", false);
+    setActive("set-engine", "engine", settings.engine, false);
     setActive("set-fx", "fx", settings.fx ? "on" : "off", false);
     renderSoundCheck();
     const locked = !!getPin();
@@ -868,6 +933,15 @@
       if (settings.sfx) sfx("correct");
     });
 
+    $("set-engine").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (!c) return;
+      settings.engine = c.dataset.engine;
+      saveSettings();
+      renderSettings();
+      sfx("correct", true);
+    });
+
     $("set-loud").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
@@ -909,8 +983,10 @@
     const rows = [];
     const add = (kind, text) => rows.push(`<div class="diag-line diag-${kind}">${esc(text)}</div>`);
 
+    add("info", `Effects engine: ${sfxEngine() === "element" ? "audio element" : "Web Audio"} (${settings.engine})${diag.audio.elementPlays ? " · played " + diag.audio.elementPlays + "×" : ""}`);
     // effects (Web Audio)
-    if (!AC) add("bad", "Effects: Web Audio is not available in this browser");
+    if (sfxEngine() === "element") add(diag.audio.lastError ? "bad" : "ok", `Effects: audio element${diag.audio.lastError ? " · " + diag.audio.lastError : ""}`);
+    else if (!AC) add("bad", "Effects: Web Audio is not available in this browser");
     else if (!actx) add("warn", "Effects: not started yet — tap “Chime”");
     else {
       const tick = diag.audio.ticking === false ? " · clock frozen" : diag.audio.ticking ? " · clock running" : "";
@@ -1179,7 +1255,7 @@
     document.addEventListener(
       ev,
       () => {
-        if (settings.sfx) wakeAudio();
+        if (settings.sfx && sfxEngine() === "webaudio") wakeAudio();
       },
       true
     )
