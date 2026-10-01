@@ -288,6 +288,52 @@ const state = (env) => env.audioCtxs.map((c) => c.state).join(",");
   if (env.audioEls.length || env.audioCtxs.reduce((n, c) => n + c.oscStarts, 0) < 1) note("engine=webaudio override ignored in Home-Screen mode");
   else ok("engine=webaudio override respected even in Home-Screen mode");
 
+  // ---- 10. recorded speech ----
+  console.log("\n[Sound 10] Recorded speech clips");
+  const fs = require("fs"), pth = require("path");
+  const root = pth.join(__dirname, "..");
+  env = launch({ clips: true });
+  click(env.window, env.document.getElementById("start-btn"));
+  await sleep(30);
+  const clipUrl = env.audioEls.find((u) => /^speech\/[0-9a-f]{10}\.wav$/.test(u));
+  if (!clipUrl) note("question prompt was not played from a recorded clip");
+  else if (!fs.existsSync(pth.join(root, clipUrl))) note("clip file missing on disk: " + clipUrl);
+  else if (env.spoken.length) note("system voice used although a clip exists");
+  else ok("prompt plays from a recorded clip (" + clipUrl + "), system voice untouched");
+  env = launch({ clips: true, localStorage: withSettings({ voiceEngine: "system" }) });
+  click(env.window, env.document.getElementById("start-btn"));
+  if (!env.spoken.length || env.audioEls.some((u) => /^speech\//.test(u))) note("voiceEngine=system must use the system voice");
+  else ok("voiceEngine=system → system voice");
+  env = launch({ clips: true });
+  click(env.window, env.document.getElementById("open-settings"));
+  click(env.window, env.document.getElementById("test-voice"));
+  await sleep(950);
+  if (!env.audioEls.some((u) => /^speech\//.test(u))) note("Voice test did not use a clip");
+  else if (!/Voice engine: recorded clips · played 1/.test(env.document.getElementById("sound-check-result").textContent)) note("panel missing recorded-voice line");
+  else ok("Voice test plays a clip and the panel shows it");
+  env = launch({ clips: true, localStorage: withSettings({ voice: false }) });
+  click(env.window, env.document.getElementById("start-btn"));
+  if (env.audioEls.some((u) => /^speech\//.test(u))) note("clip played with read-aloud Off");
+  else ok("read-aloud Off → no clips");
+  // every sentence of full games must have a recording (no silent system-voice fallbacks)
+  const clips = (() => { global.window = {}; require(pth.join(root, "speech", "clips.js")); return global.window.SPEECH_CLIPS; })();
+  let missing = new Set(), spokenTotal = 0;
+  for (const L of ["A", "B", "C"]) {
+    env = launch({ clips: true, localStorage: withSettings({ level: L, types: ["pattern", "analogy", "serial", "spatial"], count: 24 }) });
+    env.window.localStorage.setItem("nnat-settings", JSON.stringify(Object.assign(JSON.parse(quiet), { level: L, count: 24, types: undefined })));
+    await sleep(5);
+    click(env.window, env.document.querySelector('#home-level [data-level="' + L + '"]'));
+    click(env.window, env.document.getElementById("start-btn"));
+    for (let i = 0; i < 24; i++) {
+      await H.answerOne(env, i % 3 === 0 ? "wrong" : "mixed", i);
+      click(env.window, env.document.getElementById("next-btn"));
+    }
+    env.spoken.forEach((t) => { spokenTotal++; if (!clips[t]) missing.add(t); });
+    env.audioEls.filter((u) => /^speech\//.test(u)).forEach((u) => { if (!fs.existsSync(pth.join(root, u))) missing.add("FILE " + u); });
+  }
+  if (missing.size) note("sentences without a recording: " + [...missing].slice(0, 5).join(" | "));
+  else ok("3 full games (A/B/C): no system-voice fallbacks, all clip files exist");
+
   const runtimeErrors = _envs.reduce((acc, e) => acc.concat(e.errors || []), []);
   if (runtimeErrors.length) note("runtime errors: " + runtimeErrors.slice(0, 5).join(" | "));
   else ok(`no runtime errors across ${_envs.length} sessions`);

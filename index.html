@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="NNAT3" />
   <title>NNAT3 Practice Game (K–Grade 2)</title>
   <meta name="description" content="A kid-friendly NNAT3-style nonverbal reasoning practice game for Kindergarten to Grade 2 (Levels A–C). Answer one question at a time." />
-  <link rel="stylesheet" href="style.css?v=20261001d" />
+  <link rel="stylesheet" href="style.css?v=20261001e" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>" />
 </head>
 <body>
@@ -163,6 +163,15 @@
         </div>
 
         <div class="set-group">
+          <p class="set-label">Voice</p>
+          <div class="chips" id="set-vengine">
+            <button class="chip" data-vengine="recorded">Recorded</button>
+            <button class="chip" data-vengine="system">System voice</button>
+          </div>
+          <p class="set-note">Recorded works on every iPhone/iPad. System voice may be silent on iOS 27.</p>
+        </div>
+
+        <div class="set-group">
           <p class="set-label">Sound effects engine</p>
           <div class="chips" id="set-engine">
             <button class="chip" data-engine="auto">Auto</button>
@@ -265,7 +274,8 @@
     <p>Made for nonverbal reasoning practice · NNAT3®-style (Levels A–C) · Not affiliated with NCS Pearson. · <span id="app-version"></span></p>
   </footer>
 
-  <script src="questions.js?v=20261001d"></script>
-  <script src="game.js?v=20261001d"></script>
+  <script src="questions.js?v=20261001e"></script>
+  <script src="speech/clips.js?v=20261001e"></script>
+  <script src="game.js?v=20261001e"></script>
 </body>
 </html>

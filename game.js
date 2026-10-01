@@ -70,6 +70,7 @@
     voice: true,
     speed: "normal",
     sfx: true,
+    voiceEngine: "recorded", // recorded | system
     engine: "auto", // sound-effects engine: auto | webaudio | element
     loud: true, // claim the iOS "playback" audio session so sound ignores the mute switch
     fx: true,
@@ -170,9 +171,75 @@
     if (synth.addEventListener) synth.addEventListener("voiceschanged", pickVoice);
   }
 
+  // ---- Recorded speech (preferred) -------------------------------------
+  // iOS 27's speechSynthesis can be dead (no voices, never finishes). Every
+  // sentence the game says is pre-recorded (speech/*.wav, see tools/) and played
+  // through a normal <audio> element, which works. Text with no recording falls
+  // back to the system voice.
+  const CLIPS = window.SPEECH_CLIPS || {};
+  const CLIP_RATE = { slow: 0.85, normal: 1, fast: 1.2 };
+  let curClip = null;
+  function stopClip() {
+    try {
+      if (curClip) {
+        curClip.onended = curClip.onerror = null;
+        curClip.pause();
+      }
+    } catch (_) {}
+    curClip = null;
+  }
+  function playClip(text, onend) {
+    const url = CLIPS[text];
+    if (!url || settings.voiceEngine === "system" || typeof Audio !== "function") return false;
+    stopClip();
+    try {
+      const a = new Audio(url);
+      a.playbackRate = CLIP_RATE[settings.speed] || 1;
+      try {
+        a.preservesPitch = true;
+      } catch (_) {}
+      curClip = a;
+      const done = () => {
+        if (curClip === a) curClip = null;
+        listenBtn && listenBtn.classList.remove("speaking");
+        if (onend) onend();
+      };
+      a.onended = done;
+      a.onerror = () => {
+        diag.speech.clipErrors = (diag.speech.clipErrors || 0) + 1;
+        done();
+      };
+      listenBtn && listenBtn.classList.add("speaking");
+      const p = a.play();
+      diag.speech.clipPlays = (diag.speech.clipPlays || 0) + 1;
+      if (p && p.catch)
+        p.catch((e) => {
+          diag.speech.clipErrors = (diag.speech.clipErrors || 0) + 1;
+          diag.speech.lastClipError = String(e && e.message ? e.message : e);
+          warn("clip play", e);
+          done();
+        });
+      return true;
+    } catch (e) {
+      warn("playClip", e);
+      return false;
+    }
+  }
+
   // `force` lets the Sound check speak even when read-aloud is switched off.
   function speak(text, onend, force) {
-    if (!synth || (!force && !settings.voice) || !text) {
+    if ((!force && !settings.voice) || !text) {
+      if (onend) onend();
+      return;
+    }
+    if (playClip(text, onend)) {
+      speakSeq++; // supersede any pending system-voice speak
+      try {
+        if (synth) synth.cancel();
+      } catch (_) {}
+      return;
+    }
+    if (!synth) {
       if (onend) onend();
       return;
     }
@@ -245,6 +312,7 @@
   }
   function stopSpeaking() {
     speakSeq++;
+    stopClip();
     try {
       if (synth) synth.cancel();
     } catch (_) {}
@@ -794,11 +862,7 @@
     }
 
     const msg =
-      ratio >= 0.8
-        ? `Amazing! You got ${score} out of ${total} right!`
-        : ratio >= 0.5
-        ? `Great job! You got ${score} out of ${total} right!`
-        : `Good try! You got ${score} out of ${total}. Let's play again!`;
+      ratio >= 0.8 ? "Amazing! You did great!" : ratio >= 0.5 ? "Great job! Keep it up!" : "Good try! Let's play again!";
     speak(msg);
   }
 
@@ -850,6 +914,7 @@
     setActive("set-sfx", "sfx", settings.sfx ? "on" : "off", false);
     setActive("set-loud", "loud", settings.loud ? "on" : "off", false);
     setActive("set-engine", "engine", settings.engine, false);
+    setActive("set-vengine", "vengine", settings.voiceEngine, false);
     setActive("set-fx", "fx", settings.fx ? "on" : "off", false);
     renderSoundCheck();
     const locked = !!getPin();
@@ -933,6 +998,15 @@
       if (settings.sfx) sfx("correct");
     });
 
+    $("set-vengine").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (!c) return;
+      settings.voiceEngine = c.dataset.vengine;
+      saveSettings();
+      renderSettings();
+      speak("Hello! Let's play.", null, true);
+    });
+
     $("set-engine").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
@@ -1002,6 +1076,11 @@
     if (!as) add("warn", "Audio channel: not supported here (sound follows the iPad mute switch)");
     else add(as.type === "playback" ? "ok" : "warn", `Audio channel: ${as.type}${as.type === "playback" ? " (plays even when muted)" : " (follows the mute switch)"}`);
     // voice
+    const sp0 = diag.speech;
+    add(
+      sp0.clipErrors ? "bad" : sp0.clipPlays ? "ok" : "info",
+      `Voice engine: ${settings.voiceEngine === "system" ? "system voice" : "recorded clips"}${sp0.clipPlays ? " · played " + sp0.clipPlays + "×" : ""}${sp0.clipErrors ? " · failed " + sp0.clipErrors + "× " + (sp0.lastClipError || "") : ""}`
+    );
     if (!synth) add("bad", "Voice: speech is not available in this browser");
     else {
       let n = 0;

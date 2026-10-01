@@ -173,6 +173,7 @@ function launch(opts = {}) {
   const qjs = fs.readFileSync(path.join(ROOT, "questions.js"), "utf8");
   const gjs = fs.readFileSync(path.join(ROOT, "game.js"), "utf8");
   window.eval(qjs);
+  if (opts.clips) window.eval(fs.readFileSync(path.join(ROOT, "speech", "clips.js"), "utf8"));
 
   // capture the deck the game will use so the test knows the answers
   const decks = [];
