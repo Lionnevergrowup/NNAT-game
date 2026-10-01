@@ -57,6 +57,7 @@
     voice: true,
     speed: "normal",
     sfx: true,
+    loud: true, // claim the iOS "playback" audio session so sound ignores the mute switch
     fx: true,
   };
   const levelTypes = (l) => (window.NNAT && NNAT.levelTypes ? NNAT.levelTypes(l) : ["pattern", "analogy"]);
@@ -96,84 +97,265 @@
   }
   const RATE = { slow: 0.8, normal: 0.95, fast: 1.18 };
 
+  // ---- Audio health (read by Settings → Sound check) -------------------
+  // The real iPad can fail in ways no test stub can, so keep a small record of
+  // what actually happened instead of swallowing every error.
+  const diag = {
+    speech: { starts: 0, ends: 0, errors: [] },
+    audio: { rebuilds: 0, resumeFails: 0, lastError: "", ticking: null },
+  };
+  function warn(where, e) {
+    try {
+      console.warn("[sound] " + where, e);
+    } catch (_) {}
+  }
+
+  // ---- Audio session (iOS) ---------------------------------------------
+  // By default WebKit puts Web Audio in the "ambient" session, which obeys the
+  // iPad mute switch / Control Center bell. Claiming "playback" makes the game's
+  // sounds audible even when muted (feature-detected; older browsers ignore it).
+  function applyAudioSession() {
+    try {
+      const as = navigator.audioSession;
+      if (!as) return;
+      const want = settings.loud ? "playback" : "auto";
+      if (as.type !== want) as.type = want;
+    } catch (e) {
+      warn("audioSession", e);
+    }
+  }
+
   // ---- English text-to-speech -----------------------------------------
   const synth = window.speechSynthesis || null;
   let enVoice = null;
+  let curUtter = null; // strong reference: iOS can garbage-collect a live utterance
+  let speakSeq = 0; // lets a newer speak()/stop supersede a delayed one
+
+  const PREFERRED_VOICES = ["Samantha", "Ava", "Allison", "Susan", "Karen", "Moira", "Tessa", "Zira", "Google US English"];
+  const NOVELTY_VOICES = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox/i;
   function pickVoice() {
     if (!synth) return;
-    const voices = synth.getVoices();
-    enVoice =
-      voices.find((v) => /en[-_]US/i.test(v.lang) && /female|samantha|zira|google/i.test(v.name)) ||
-      voices.find((v) => /^en[-_]/i.test(v.lang)) ||
-      voices[0] ||
-      null;
+    let voices = [];
+    try {
+      voices = synth.getVoices() || [];
+    } catch (e) {
+      warn("getVoices", e);
+    }
+    const en = voices.filter((v) => /^en[-_]/i.test(v.lang || "") && !NOVELTY_VOICES.test(v.name || ""));
+    const us = en.filter((v) => /^en[-_]US/i.test(v.lang));
+    let best = null;
+    for (const n of PREFERRED_VOICES) {
+      best = us.find((v) => (v.name || "").indexOf(n) !== -1);
+      if (best) break;
+    }
+    // never fall back to voices[0]: it can be a non-English or silent voice
+    enVoice = best || us[0] || en[0] || null;
   }
   if (synth) {
     pickVoice();
     if (synth.addEventListener) synth.addEventListener("voiceschanged", pickVoice);
   }
 
-  function speak(text, onend) {
-    if (!synth || !settings.voice || !text) {
+  // `force` lets the Sound check speak even when read-aloud is switched off.
+  function speak(text, onend, force) {
+    if (!synth || (!force && !settings.voice) || !text) {
       if (onend) onend();
       return;
     }
-    try {
-      synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "en-US";
-      if (enVoice) u.voice = enVoice;
-      u.rate = RATE[settings.speed] || 0.95;
-      u.pitch = 1.05;
-      u.onstart = () => listenBtn && listenBtn.classList.add("speaking");
-      u.onend = () => {
-        listenBtn && listenBtn.classList.remove("speaking");
+    const mySeq = ++speakSeq;
+    const run = () => {
+      if (mySeq !== speakSeq) return; // superseded by a newer speak() or a stop
+      try {
+        if (!enVoice) pickVoice();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = "en-US";
+        if (enVoice) u.voice = enVoice;
+        u.rate = RATE[settings.speed] || 0.95;
+        u.pitch = 1.05;
+        let started = false;
+        u.onstart = () => {
+          started = true;
+          diag.speech.starts += 1;
+          listenBtn && listenBtn.classList.add("speaking");
+        };
+        u.onend = () => {
+          diag.speech.ends += 1;
+          listenBtn && listenBtn.classList.remove("speaking");
+          if (curUtter === u) curUtter = null;
+          audioDirty = true; // iOS 27 can silence Web Audio after speech: rebuild next tap
+          if (onend) onend();
+        };
+        u.onerror = (ev) => {
+          const why = (ev && ev.error) || "error";
+          if (why !== "canceled" && why !== "interrupted") diag.speech.errors.push(String(why));
+          listenBtn && listenBtn.classList.remove("speaking");
+          if (curUtter === u) curUtter = null;
+          audioDirty = true;
+          if (onend) onend();
+        };
+        curUtter = u;
+        synth.speak(u);
+        // un-pause a wedged iOS queue — resume() only helps AFTER speak()
+        try {
+          synth.resume();
+        } catch (_) {}
+        // if it never starts, nudge once (don't re-speak: iOS can play without events)
+        setTimeout(() => {
+          if (mySeq === speakSeq && !started && curUtter === u) {
+            try {
+              synth.resume();
+            } catch (_) {}
+          }
+        }, 700);
+      } catch (e) {
+        warn("speak", e);
+        diag.speech.errors.push(String(e));
         if (onend) onend();
-      };
-      synth.speak(u);
-    } catch (e) {
-      if (onend) onend();
+      }
+    };
+    // Only cancel when something is queued, and wait a beat afterwards:
+    // cancel() immediately followed by speak() is dropped by some WebKit builds.
+    let busy = false;
+    try {
+      busy = !!(synth.speaking || synth.pending || synth.paused);
+    } catch (_) {}
+    if (busy) {
+      try {
+        synth.cancel();
+      } catch (_) {}
+      setTimeout(run, 80);
+    } else {
+      run();
     }
   }
   function stopSpeaking() {
-    if (synth) synth.cancel();
+    speakSeq++;
+    try {
+      if (synth) synth.cancel();
+    } catch (_) {}
+    curUtter = null;
     listenBtn && listenBtn.classList.remove("speaking");
   }
 
   // ---- Sound effects (synthesised, no audio files) --------------------
+  const AC = window.AudioContext || window.webkitAudioContext;
   let actx = null;
-  function tone(freq, start, dur, gain, type) {
-    const now = actx.currentTime + start;
-    const o = actx.createOscillator();
-    const g = actx.createGain();
+  let audioDirty = true; // true → build a fresh context at the next user gesture
+
+  function closeCtx(c) {
+    try {
+      const p = c && c.close && c.close();
+      if (p && p.catch) p.catch(() => {});
+    } catch (_) {}
+  }
+  function newCtx() {
+    closeCtx(actx);
+    actx = null;
+    if (!AC) return null;
+    try {
+      const c = new AC();
+      actx = c;
+      diag.audio.rebuilds += 1;
+      if (c.addEventListener)
+        c.addEventListener("statechange", () => {
+          // iOS flips a context to "interrupted" (call, Siri, backgrounding)
+          if (c === actx && (c.state === "interrupted" || c.state === "closed")) audioDirty = true;
+        });
+    } catch (e) {
+      warn("new AudioContext", e);
+      diag.audio.lastError = String(e);
+      actx = null;
+    }
+    return actx;
+  }
+  // Playing one silent sample inside a tap fully unlocks output on iOS.
+  function unlockBuffer(c) {
+    try {
+      if (!c.createBuffer || !c.createBufferSource) return;
+      const s = c.createBufferSource();
+      s.buffer = c.createBuffer(1, 1, 22050);
+      s.connect(c.destination);
+      if (s.start) s.start(0);
+    } catch (_) {}
+  }
+  // Make sure a RUNNING AudioContext exists. Call from a user gesture (tap/key)
+  // so iOS lets it start. Rebuilds a dead/interrupted/closed context.
+  function wakeAudio(forceRebuild) {
+    if (!AC) return null;
+    try {
+      if (forceRebuild || audioDirty || !actx || actx.state === "closed") {
+        newCtx();
+        audioDirty = false;
+      }
+      if (!actx) return null;
+      if (actx.state === "running") return actx;
+      const c = actx;
+      const p = c.resume && c.resume();
+      if (p && p.catch)
+        p.catch((e) => {
+          diag.audio.resumeFails += 1;
+          diag.audio.lastError = String(e && e.message ? e.message : e);
+          warn("resume", e);
+          if (c === actx) audioDirty = true;
+        });
+      unlockBuffer(c);
+      // iOS 26 can leave resume() pending forever: if it is still not running, rebuild next tap
+      setTimeout(() => {
+        if (c === actx && c.state !== "running") audioDirty = true;
+      }, 700);
+    } catch (e) {
+      warn("wakeAudio", e);
+      diag.audio.lastError = String(e);
+    }
+    return actx;
+  }
+  function tone(c, freq, start, dur, gain, type) {
+    const now = c.currentTime + start;
+    const o = c.createOscillator();
+    const g = c.createGain();
     o.type = type || "sine";
     o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(gain || 0.18, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(gain || 0.22, now + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    o.connect(g).connect(actx.destination);
+    o.connect(g);
+    g.connect(c.destination);
     o.start(now);
     o.stop(now + dur + 0.02);
   }
-  function sfx(kind) {
-    if (!settings.sfx) return;
+  // `force` lets the Sound check play even when fun sounds are switched off.
+  function sfx(kind, force) {
+    if (!force && !settings.sfx) return;
     try {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === "suspended") actx.resume();
+      const c = wakeAudio();
+      if (!c) return;
       if (kind === "correct") {
-        tone(660, 0, 0.13);
-        tone(880, 0.1, 0.2);
+        tone(c, 660, 0, 0.13);
+        tone(c, 880, 0.1, 0.2);
       } else if (kind === "wrong") {
-        tone(196, 0, 0.28, 0.16, "triangle");
+        tone(c, 220, 0, 0.3, 0.2, "triangle");
       } else if (kind === "streak") {
-        tone(784, 0, 0.12);
-        tone(1047, 0.1, 0.2);
+        tone(c, 784, 0, 0.12);
+        tone(c, 1047, 0.1, 0.2);
       } else if (kind === "win") {
-        [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.28));
+        [523, 659, 784, 1047].forEach((f, i) => tone(c, f, i * 0.13, 0.28));
       } else if (kind === "tap") {
-        tone(440, 0, 0.06, 0.1);
+        tone(c, 440, 0, 0.06, 0.12);
       }
-    } catch (e) {}
+    } catch (e) {
+      warn("sfx", e);
+      diag.audio.lastError = String(e);
+    }
+  }
+  // Does the audio clock actually advance? (a context can say "running" yet be dead)
+  function probeClock() {
+    const c = actx;
+    if (!c) return;
+    const t0 = c.currentTime;
+    setTimeout(() => {
+      if (c === actx) diag.audio.ticking = c.currentTime - t0 > 0.15;
+      renderSoundCheck();
+    }, 450);
   }
 
   // ---- Confetti -------------------------------------------------------
@@ -588,7 +770,9 @@
     setActive("set-voice", "voice", settings.voice ? "on" : "off", false);
     setActive("set-speed", "speed", settings.speed, false);
     setActive("set-sfx", "sfx", settings.sfx ? "on" : "off", false);
+    setActive("set-loud", "loud", settings.loud ? "on" : "off", false);
     setActive("set-fx", "fx", settings.fx ? "on" : "off", false);
+    renderSoundCheck();
     const locked = !!getPin();
     $("lock-status").textContent = locked
       ? "Lock is ON — a PIN is needed to open Settings & Progress."
@@ -670,6 +854,16 @@
       if (settings.sfx) sfx("correct");
     });
 
+    $("set-loud").addEventListener("click", (e) => {
+      const c = e.target.closest(".chip");
+      if (!c) return;
+      settings.loud = c.dataset.loud === "on";
+      saveSettings();
+      applyAudioSession();
+      renderSettings();
+      sfx("correct", true);
+    });
+
     $("set-fx").addEventListener("click", (e) => {
       const c = e.target.closest(".chip");
       if (!c) return;
@@ -678,6 +872,63 @@
       renderSettings();
       if (settings.fx) burst(true);
     });
+  }
+
+  // ---- Sound check (Settings): shows what the device is REALLY doing ----
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+  function isStandalone() {
+    try {
+      return !!(navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches));
+    } catch (_) {
+      return false;
+    }
+  }
+  function deviceInfo() {
+    const ua = (navigator.userAgent || "").trim();
+    const inParens = (ua.match(/\(([^)]*)\)/) || [])[1] || "";
+    const ver = (ua.match(/Version\/([\d.]+)/) || [])[1];
+    return (inParens + (ver ? " · Safari " + ver : "")).slice(0, 90) || "unknown";
+  }
+  function renderSoundCheck() {
+    const el = $("sound-check-result");
+    if (!el) return;
+    const rows = [];
+    const add = (kind, text) => rows.push(`<div class="diag-line diag-${kind}">${esc(text)}</div>`);
+
+    // effects (Web Audio)
+    if (!AC) add("bad", "Effects: Web Audio is not available in this browser");
+    else if (!actx) add("warn", "Effects: not started yet — tap “Chime”");
+    else {
+      const tick = diag.audio.ticking === false ? " · clock frozen" : diag.audio.ticking ? " · clock running" : "";
+      const rb = diag.audio.rebuilds > 1 ? ` · rebuilt ${diag.audio.rebuilds - 1}×` : "";
+      const err = diag.audio.lastError ? ` · ${diag.audio.lastError}` : "";
+      add(actx.state === "running" && diag.audio.ticking !== false ? "ok" : "bad", `Effects: ${actx.state}${tick}${rb}${err}`);
+    }
+    // audio channel
+    let as = null;
+    try {
+      as = navigator.audioSession || null;
+    } catch (_) {}
+    if (!as) add("warn", "Audio channel: not supported here (sound follows the iPad mute switch)");
+    else add(as.type === "playback" ? "ok" : "warn", `Audio channel: ${as.type}${as.type === "playback" ? " (plays even when muted)" : " (follows the mute switch)"}`);
+    // voice
+    if (!synth) add("bad", "Voice: speech is not available in this browser");
+    else {
+      let n = 0;
+      try {
+        n = (synth.getVoices() || []).filter((v) => /^en[-_]/i.test(v.lang || "")).length;
+      } catch (_) {}
+      const sp = diag.speech;
+      const errs = sp.errors.length ? ` · errors: ${sp.errors.slice(-2).join(", ")}` : "";
+      add(
+        sp.errors.length ? "bad" : sp.starts ? "ok" : "warn",
+        `Voice: ${n} English voice${n === 1 ? "" : "s"} · using ${enVoice ? enVoice.name : "default"} · started ${sp.starts}, finished ${sp.ends}${errs}`
+      );
+    }
+    add("info", `Opened as: ${isStandalone() ? "Home-Screen app" : "browser tab"} · ${deviceInfo()}`);
+    el.innerHTML =
+      rows.join("") +
+      `<div class="diag-help">Heard nothing? ① Turn off iPad mute (Control Center 🔔) and raise the volume ② Open this address in a normal Safari tab ③ Delete the Home-Screen icon and add it again ④ Update iPadOS.</div>`;
   }
 
   function showSettings() {
@@ -905,6 +1156,48 @@
   updateSoundToggleUI();
   wireChips();
   renderHomeLevel();
+  applyAudioSession();
+
+  // iOS only lets audio start inside a real tap. Wake (or rebuild) the audio
+  // engine on EVERY user gesture so it is already running when a sound is needed.
+  ["touchend", "click", "keydown"].forEach((ev) =>
+    document.addEventListener(
+      ev,
+      () => {
+        if (settings.sfx || settings.voice) wakeAudio();
+      },
+      true
+    )
+  );
+  // Coming back to the app (iPad Home-Screen apps get suspended): the audio
+  // engine and the speech queue can be dead — reset them on return.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopSpeaking();
+    } else {
+      audioDirty = true;
+      try {
+        if (synth) {
+          synth.cancel();
+          synth.resume();
+        }
+      } catch (_) {}
+    }
+  });
+  window.addEventListener("pageshow", () => {
+    audioDirty = true;
+  });
+
+  // Sound check buttons (Settings): mirror what happens in real play
+  $("test-chime").addEventListener("click", () => {
+    sfx("correct", true);
+    probeClock();
+    setTimeout(renderSoundCheck, 80);
+  });
+  $("test-voice").addEventListener("click", () => {
+    speak("Sound check. Can you hear me?", renderSoundCheck, true);
+    setTimeout(renderSoundCheck, 900);
+  });
 
   $("home-level").addEventListener("click", (e) => {
     const c = e.target.closest(".chip");

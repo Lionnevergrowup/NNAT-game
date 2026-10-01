@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="NNAT3" />
   <title>NNAT3 Practice Game (K–Grade 2)</title>
   <meta name="description" content="A kid-friendly NNAT3-style nonverbal reasoning practice game for Kindergarten to Grade 2 (Levels A–C). Answer one question at a time." />
-  <link rel="stylesheet" href="style.css?v=20260616b" />
+  <link rel="stylesheet" href="style.css?v=20261001a" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧩</text></svg>" />
 </head>
 <body>
@@ -51,7 +51,7 @@
           <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         </div>
         <div id="streak-chip" class="streak-chip hidden">🔥 <span id="streak">0</span></div>
-        <button id="sound-toggle" class="icon-btn" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+        <button id="sound-toggle" class="icon-btn" title="Read aloud on/off" aria-label="Toggle read aloud">🔊</button>
         <div class="score-chip">⭐ <span id="score">0</span></div>
       </header>
 
@@ -154,6 +154,24 @@
         </div>
 
         <div class="set-group">
+          <p class="set-label">Play sound even when iPad is muted</p>
+          <div class="chips" id="set-loud">
+            <button class="chip" data-loud="on">🔔 On</button>
+            <button class="chip" data-loud="off">Off</button>
+          </div>
+          <p class="set-note">iPad/iPhone only. Turn Off to follow the mute switch.</p>
+        </div>
+
+        <div class="set-group">
+          <p class="set-label">🔊 Sound check</p>
+          <div class="chips">
+            <button class="chip" id="test-chime">🔔 Chime</button>
+            <button class="chip" id="test-voice">🗣 Voice</button>
+          </div>
+          <div id="sound-check-result" class="sound-check"></div>
+        </div>
+
+        <div class="set-group">
           <p class="set-label">Confetti &amp; celebration</p>
           <div class="chips" id="set-fx">
             <button class="chip" data-fx="on">🎉 On</button>
@@ -237,7 +255,7 @@
     <p>Made for nonverbal reasoning practice · NNAT3®-style (Levels A–C) · Not affiliated with NCS Pearson.</p>
   </footer>
 
-  <script src="questions.js?v=20260616b"></script>
-  <script src="game.js?v=20260616b"></script>
+  <script src="questions.js?v=20261001a"></script>
+  <script src="game.js?v=20261001a"></script>
 </body>
 </html>

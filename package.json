@@ -1,9 +1,9 @@
 {
   "name": "nnat3-level-a-game",
   "private": true,
-  "description": "NNAT3 Level A practice game — static site",
+  "description": "NNAT3 Level A practice game \u2014 static site",
   "scripts": {
-    "test": "node test/play.js && node test/probe.js"
+    "test": "node test/play.js && node test/probe.js && node test/sound.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"

@@ -30,34 +30,112 @@ function launch(opts = {}) {
     Object.entries(opts.localStorage).forEach(([k, v]) => window.localStorage.setItem(k, v));
   }
 
-  // speechSynthesis stub (records what was spoken)
+  // speechSynthesis stub — configurable and able to FAIL (the old always-OK stub
+  // is why real-device silence never showed up in tests).
   const spoken = [];
+  const utterances = [];
+  const speechLog = []; // "cancel" | "resume" | "speak:<text>"
+  const speechCfg = Object.assign(
+    { voices: [{ name: "Samantha", lang: "en-US" }], autoStart: true, autoEnd: true, throwOnSpeak: false },
+    opts.speech || {}
+  );
+  const synthState = { speaking: false, pending: false, paused: false, cancelCalls: 0, resumeCalls: 0 };
   window.speechSynthesis = {
-    getVoices: () => [{ name: "Samantha", lang: "en-US" }],
-    speak: (u) => {
-      spoken.push(u.text);
-      if (u.onstart) u.onstart();
-      if (u.onend) setTimeout(u.onend, 0);
+    getVoices: () => speechCfg.voices,
+    get speaking() {
+      return synthState.speaking;
     },
-    cancel: () => {},
+    get pending() {
+      return synthState.pending;
+    },
+    get paused() {
+      return synthState.paused;
+    },
+    speak: (u) => {
+      speechLog.push("speak:" + u.text);
+      if (speechCfg.throwOnSpeak) throw new Error("speak failed");
+      spoken.push(u.text);
+      utterances.push(u);
+      synthState.speaking = true;
+      if (speechCfg.autoStart && u.onstart) u.onstart();
+      if (speechCfg.autoEnd)
+        setTimeout(() => {
+          synthState.speaking = false;
+          if (u.onend) u.onend();
+        }, 0);
+    },
+    cancel: () => {
+      speechLog.push("cancel");
+      synthState.cancelCalls++;
+      synthState.speaking = false;
+      synthState.pending = false;
+    },
+    resume: () => {
+      speechLog.push("resume");
+      synthState.resumeCalls++;
+      synthState.paused = false;
+    },
+    pause: () => {},
     addEventListener: () => {},
   };
   window.SpeechSynthesisUtterance = function (t) {
     this.text = t;
   };
 
-  // Web Audio stub
+  // Web Audio stub — records every context, can start suspended/interrupted,
+  // reject or hang resume(), freeze its clock, and lack createBuffer.
   const tones = [];
+  const audioCtxs = [];
+  const audioCfg = Object.assign(
+    { state: "running", resume: "ok", frozen: false, hasCreateBuffer: true },
+    opts.audio || {}
+  );
   function FakeAudio() {
-    this.state = "running";
-    this.currentTime = 0;
+    const self = this;
+    const t0 = Date.now();
+    audioCtxs.push(self);
+    this.index = audioCtxs.length - 1;
+    this.state = audioCfg.state;
+    this.resumeCalls = 0;
+    this.closed = false;
+    this.oscStarts = 0;
+    this.bufferStarts = 0;
+    this._listeners = {};
+    Object.defineProperty(this, "currentTime", { get: () => (audioCfg.frozen ? 0 : (Date.now() - t0) / 1000) });
     this.destination = {};
-    this.resume = () => {};
+    this.addEventListener = (ev, fn) => {
+      (self._listeners[ev] = self._listeners[ev] || []).push(fn);
+    };
+    this.setState = (st) => {
+      self.state = st;
+      (self._listeners.statechange || []).forEach((f) => f());
+    };
+    this.resume = () => {
+      self.resumeCalls++;
+      if (audioCfg.resume === "reject") return Promise.reject(new Error("InvalidStateError"));
+      if (audioCfg.resume === "hang") return new Promise(() => {});
+      return new Promise((res) => {
+        self.state = "running";
+        res();
+      });
+    };
+    this.close = () => {
+      self.closed = true;
+      self.state = "closed";
+      return Promise.resolve();
+    };
+    this.createBuffer = audioCfg.hasCreateBuffer ? () => ({}) : undefined;
+    this.createBufferSource = audioCfg.hasCreateBuffer
+      ? () => ({ connect() {}, start() { self.bufferStarts++; } })
+      : undefined;
     this.createOscillator = () => ({
       type: "sine",
       frequency: { value: 0 },
       connect: () => ({ connect: () => {} }),
-      start: () => {},
+      start: () => {
+        self.oscStarts++;
+        tones.push({ ctx: self.index });
+      },
       stop: () => {},
     });
     this.createGain = () => ({
@@ -71,6 +149,8 @@ function launch(opts = {}) {
   }
   window.AudioContext = FakeAudio;
   window.webkitAudioContext = FakeAudio;
+  if (opts.audioSession)
+    Object.defineProperty(window.navigator, "audioSession", { value: opts.audioSession, configurable: true, writable: true });
 
   // rAF + getBoundingClientRect (jsdom returns zeros; give plausible boxes)
   window.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
@@ -104,7 +184,7 @@ function launch(opts = {}) {
 
   window.eval(gjs);
 
-  return { dom, window, document, spoken, tones, decks, live, errors };
+  return { dom, window, document, spoken, tones, decks, live, errors, audioCtxs, audioCfg, speechCfg, speechLog, utterances, synthState };
 }
 
 // helpers --------------------------------------------------------------

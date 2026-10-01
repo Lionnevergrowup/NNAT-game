@@ -575,3 +575,25 @@ body {
   .bar-fill { transition: none !important; }
   * { scroll-behavior: auto !important; }
 }
+
+/* ---------- Sound check panel (Settings) ---------- */
+.sound-check {
+  text-align: left;
+  background: #f7f8fd;
+  border: 2px solid #ece7fb;
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.diag-line { margin: 2px 0; font-weight: 700; word-break: break-word; }
+.diag-line::before { display: inline-block; width: 1.4em; font-weight: 800; }
+.diag-ok::before { content: "✓"; color: var(--good); }
+.diag-bad { color: #c0392b; }
+.diag-bad::before { content: "✗"; color: var(--bad); }
+.diag-warn::before { content: "!"; color: #d98a00; }
+.diag-info { color: var(--muted); font-weight: 600; }
+.diag-info::before { content: "i"; color: var(--muted); }
+.diag-help { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #d6d9e6; color: var(--muted); font-weight: 600; }
