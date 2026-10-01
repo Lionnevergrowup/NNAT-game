@@ -9,6 +9,19 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Version = the ?v= on the game.js URL that was ACTUALLY loaded (so a stale
+  // cached script shows up as an old number).
+  const APP_VERSION = (() => {
+    try {
+      const m = ((document.currentScript && document.currentScript.src) || "").match(/[?&]v=([\w.-]+)/);
+      return m ? m[1] : "dev";
+    } catch (_) {
+      return "dev";
+    }
+  })();
+  const verEl = document.getElementById("app-version");
+  if (verEl) verEl.textContent = "v" + APP_VERSION;
+
   // Screens
   const startScreen = $("start-screen");
   const quizScreen = $("quiz-screen");
@@ -925,6 +938,7 @@
         `Voice: ${n} English voice${n === 1 ? "" : "s"} · using ${enVoice ? enVoice.name : "default"} · started ${sp.starts}, finished ${sp.ends}${errs}`
       );
     }
+    add("info", `App version: v${APP_VERSION}`);
     add("info", `Opened as: ${isStandalone() ? "Home-Screen app" : "browser tab"} · ${deviceInfo()}`);
     el.innerHTML =
       rows.join("") +
