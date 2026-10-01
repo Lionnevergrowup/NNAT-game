@@ -111,8 +111,22 @@ const state = (env) => env.audioCtxs.map((c) => c.state).join(",");
   const before = env.audioCtxs.length;
   tap(env);
   await sleep(20);
-  if (env.audioCtxs.length <= before) note("context not rebuilt after speech finished (iOS 27 hedge)");
-  else ok("speech finished → audio rebuilt on the next tap");
+  if (env.audioCtxs.length !== before) note("context churned just because speech finished (cold-start risk)");
+  else ok("speech finished → warm context kept (no churn)");
+
+  env = launch({ speech: { autoEnd: false } });
+  tap(env, env.document.getElementById("start-btn"));
+  const nb = env.audioCtxs.length;
+  const uu = env.utterances[0];
+  uu.onerror({ error: "canceled" });
+  tap(env);
+  if (env.audioCtxs.length !== nb) note("'canceled' error caused a rebuild");
+  uu.onerror({ error: "synthesis-failed" });
+  tap(env);
+  await sleep(20);
+  if (env.audioCtxs.length <= nb) note("a real speech error did not refresh audio");
+  else if (!/errors: synthesis-failed/.test((env.document.getElementById("open-settings").click(), env.document.getElementById("sound-check-result").textContent))) note("speech error not shown in Sound check");
+  else ok("'canceled' ignored; real speech error → refresh + shown in Sound check");
 
   env = launch({ speech: { autoEnd: false } });
   tap(env, env.document.getElementById("start-btn")); // prompt "speaking" forever

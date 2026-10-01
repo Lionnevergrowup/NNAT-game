@@ -131,7 +131,7 @@
     try {
       const as = navigator.audioSession;
       if (!as) return;
-      const want = settings.loud ? "playback" : "auto";
+      const want = settings.loud && (settings.sfx || settings.voice) ? "playback" : "auto";
       if (as.type !== want) as.type = want;
     } catch (e) {
       warn("audioSession", e);
@@ -195,15 +195,16 @@
           diag.speech.ends += 1;
           listenBtn && listenBtn.classList.remove("speaking");
           if (curUtter === u) curUtter = null;
-          audioDirty = true; // iOS 27 can silence Web Audio after speech: rebuild next tap
           if (onend) onend();
         };
         u.onerror = (ev) => {
           const why = (ev && ev.error) || "error";
-          if (why !== "canceled" && why !== "interrupted") diag.speech.errors.push(String(why));
+          if (why !== "canceled" && why !== "interrupted") {
+            diag.speech.errors.push(String(why));
+            audioDirty = true; // a real speech failure: refresh audio on the next tap
+          }
           listenBtn && listenBtn.classList.remove("speaking");
           if (curUtter === u) curUtter = null;
-          audioDirty = true;
           if (onend) onend();
         };
         curUtter = u;
@@ -1178,7 +1179,7 @@
     document.addEventListener(
       ev,
       () => {
-        if (settings.sfx || settings.voice) wakeAudio();
+        if (settings.sfx) wakeAudio();
       },
       true
     )
@@ -1188,6 +1189,9 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       stopSpeaking();
+      try {
+        if (actx && actx.state === "running" && actx.suspend) actx.suspend().catch(() => {});
+      } catch (_) {}
     } else {
       audioDirty = true;
       try {
